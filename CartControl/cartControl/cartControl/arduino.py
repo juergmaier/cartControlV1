@@ -1,7 +1,8 @@
-import serial
 import time
 import cartControl
 import gui
+import serial
+import sys
 
 ser=None
 
@@ -10,7 +11,7 @@ def initSerial(comPort):
   
     while True:
         try:
-            ser = serial.Serial(port=comPort, baudrate=115200, timeout=0.1)
+            ser = serial.Serial(port=comPort, baudrate=115200, timeout=0.5)
             print("Serial comm to arduino established")
             break
 
@@ -18,8 +19,9 @@ def initSerial(comPort):
             print("exception on serial connect with " + comPort)
             time.sleep(1)
 
-
+#####################################
 # readMessages runs in its own thread
+#####################################
 def readMessages():
 
     global ser
@@ -30,41 +32,59 @@ def readMessages():
     while ser.is_open:
 
         while ser.inWaiting() > 0:
-            recv = ser.readline()
+            recvB = ser.readline()
+            recv = recvB.decode()
+            msgID = recvB[0:3].decode()
 
-            if recv[0:10] == "cart ready":
+            #print("in read message: ", msgID)
+
+            if msgID == "!A0":     #"cart ready"
                 cartControl.arduinoStatus = 1
 
-            elif recv[0:14] == "orientation x:":
-                newOrientation = float(recv[14:])
+            elif msgID == "!A1":    #"distance,":
+                #!A1,<sensorID>,<ANZ_MESSUNGEN_PRO_SCAN>,[ANZ_MESSUNGEN_PRO_SCAN<value>,]
+                messageItems =  [int(e) if e.isdigit() else e for e in recv.split(',')]
+                cartControl.updateDistances(messageItems[1:])
+                gui.controller.showDistances(messageItems[1])
+                
+
+            elif msgID == "!A2":    #"obstacle:":
+                #!A2,<distance>
+                distance = float(recv.split(",")[1])
+                cartControl.movementBlocked = True
+                cartControl.timeMovementBlocked = time.time()
+                gui.controller.updateDistanceSensorObstacle(distance)
+
+            elif msgID == "!A4":    #"abyss:":
+                #!A3,<distance>
+                distance = float(recv.split(",")[1])
+                cartControl.movementBlocked = True                
+                cartControl.timeMovementBlocked = time.time()
+                gui.controller.updateDistanceSensorAbyss(distance)
+
+            elif msgID == "!A5":    # orientation x:":
+                #!A5,<orientation>
+                newOrientation = float(recv.split(",")[1])
                 if int(cartControl.orientation) != int(newOrientation):
                     cartControl.orientation = newOrientation
                     print ("new cart orientation: " + str(cartControl.orientation))
 
-            elif recv[0:9] == "distance,":
-                distanceValues =  [int(e) if e.isdigit() else e for e in recv.split(',')]
-                cartControl.updateDistances(distanceValues)
-                cartControl.movementBlocked = True
+                    # if cart is in rotation no blocking exists
+                    if cartControl.movementBlocked:
+                        cartControl.movementBlocked = False
 
-            elif recv[0:9] == "obstacle:":
-                distance = float(recv[9:])
-                cartControl.movementBlocked = True           
-                gui.controller.updateDistanceSensorObstacle(distance)
-
-            elif recv[0:6] == "abyss:":
-                distance = float(recv[6:])
-                cartControl.movementBlocked = True           
-                gui.controller.updateDistanceSensorAbyss(distance)
-
-            elif recv[0:15] == "sensorDistance:":
-                #print("updateDistanceMsg: " + recv)
-                gui.controller.updateSensorDistance(recv[15:-2])
-
+                # no new orientation, check for blocked movement and stop cart
+                else:
+                    if cartControl.movementBlocked:
+                        if time.time() - cartControl.timeMovementBlocked > 3:
+                            sendStopCommand()
+                            cartControl.movementBlocked = False
+                        
             else:
                 try:
                     print ("<-A " + recv)
                 except:
-                    print ("Unexpected error:", sys.exc_info()[0])
+                    print ("Unexpected error on reading messages: ", sys.exc_info()[0])
                     pass
 
         pass
@@ -72,51 +92,45 @@ def readMessages():
 
 def sendMoveCommand(dir, speed):
 
-    msg = '1' + str(dir) + str(speed).zfill(3) + '\n'
-    print("Send move " + msg)
+    msg = b'1' + bytes(dir) + bytes(speed).zfill(3) + b'\n'
+    print("Send move " + str(msg))
     ser.write(msg) 
 
 
 def sendRotateCommand(relAngle):
 
     if relAngle > 0:   # rotate anticlock
-        msg = '2' + str(relAngle).zfill(3) + '\n'
-        print("Send rotate " + msg)
+        msg = bytes(str(abs(relAngle)+3000)+'\n','ascii')
+        print("Send rotate " + str(msg))
         ser.write(msg) 
 
     if relAngle < 0:
-        msg = '3' + str(-relAngle).zfill(3) + '\n'
-        print("Send rotate " + msg)
+        msg = bytes(str(abs(relAngle)+2000)+'\n','ascii')
+        print("Send rotate " + str(msg))
         ser.write(msg) 
 
 def sendStopCommand():
 
-    msg = '4' + '\n'
-    print("Send stop " + msg)
+    msg = b'4' + b'\n'
+    print("Send stop " + str(msg))
     ser.write(msg)
 
 
 def getCartOrientation():
 
-    msg = '5' + '\n'
+    msg = b'5' + b'\n'
     #print("get Orientation " + msg)
     ser.write(msg)
 
 
-def sendScanServoCommand(servoID):
-
-    msg = '6' + str(servoID) + '\n'
-    print("Send scanServo " + msg)
-    ser.write(msg) 
-
-
 def sendReadSensorCommand(sensorID):
 
-    msg = '7' + str(sensorID) + '\n'
-    print("Send readSensor " + msg)
+    msg = b'7' + bytes(sensorID) + b'\n'
+    print("Send readSensor " + str(msg))
     ser.write(msg) 
 
 def sendHeartbeat():
 
-    ser.write('9' + '\n')
+    msg = b'9' + b'\n'
+    ser.write(msg)
 

@@ -12,7 +12,7 @@
     <OutputPath>.</OutputPath>
     <Name>CartControl</Name>
     <RootNamespace>cartControl</RootNamespace>
-    <InterpreterId>Global|PythonCore|3.6</InterpreterId>
+    <InterpreterId>Global|ContinuumAnalytics|Anaconda36-32</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -27,12 +27,21 @@
     <Compile Include="arduino.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="cartGlobal.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="gui.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="odometry.py">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <InterpreterReference Include="Global|PythonCore|3.6" />
+    <InterpreterReference Include="Global|ContinuumAnalytics|Anaconda36-32" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include=".pylintrc" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

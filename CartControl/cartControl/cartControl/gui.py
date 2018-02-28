@@ -1,10 +1,12 @@
-import arduino
-import tkinter as tk
+
 import time
-from _thread import start_new_thread
-import numpy as np
-import cartControl
 import collections
+import tkinter as tk
+import numpy as np
+
+import arduino
+import cartGlobal
+import cartControl
 
 CANV_WIDTH = 300
 CANV_HEIGHT = 500
@@ -26,88 +28,88 @@ LONG_ARC_BOX = (MAX_RANGE_LONG + MIN_RANGE_LONG) / 2 * LINE_SCALE_LONG
 
 
 # use named tupels to make the base positions available
-# e.g. reference by: servos[0].id
+# e.g.  reference by: servos[0].id
 location = collections.namedtuple('Location', 'id x y x1 y1 x2 y2 arcFrom arcLength arcWidth')
 sensors = []
 
 # front left
-X=CANV_WIDTH/4
-Y=CANV_HEIGHT/4
+X = CANV_WIDTH / 4
+Y = CANV_HEIGHT / 4
 sensors.append(location(id=0, x=X, y=Y, 
-                        x1=X-SHORT_ARC_BOX, y1=Y-SHORT_ARC_BOX, 
-                        x2=X+SHORT_ARC_BOX,y2=Y+SHORT_ARC_BOX,
+                        x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
+                        x2=X + SHORT_ARC_BOX,y2=Y + SHORT_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(MAX_RANGE_SHORT-MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
-Y=CANV_HEIGHT/4 - 40
+                        arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+Y = CANV_HEIGHT / 4 - 40
 sensors.append(location(id=1, x=X, y=Y, 
-                        x1=X-LONG_ARC_BOX, y1=Y-LONG_ARC_BOX, 
-                        x2=X+LONG_ARC_BOX,y2=Y+LONG_ARC_BOX,
+                        x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
+                        x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(MAX_RANGE_LONG-MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(MAX_RANGE_LONG - MIN_RANGE_LONG) * LINE_SCALE_LONG))
 
 # front right
-X=CANV_WIDTH/4*3
-Y=CANV_HEIGHT/4
+X = CANV_WIDTH / 4 * 3
+Y = CANV_HEIGHT / 4
 sensors.append(location(id=2, x=X, y=Y, 
-                        x1=X-SHORT_ARC_BOX, y1=Y-SHORT_ARC_BOX, 
-                        x2=X+SHORT_ARC_BOX, y2=Y+SHORT_ARC_BOX,
+                        x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
+                        x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(MAX_RANGE_SHORT-MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
-Y=CANV_HEIGHT/4 - 40
+                        arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+Y = CANV_HEIGHT / 4 - 40
 sensors.append(location(id=3, x=X, y=Y, 
-                        x1=X-LONG_ARC_BOX, y1=Y-LONG_ARC_BOX, 
-                        x2=X+LONG_ARC_BOX,y2=Y+LONG_ARC_BOX,
+                        x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
+                        x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(MAX_RANGE_LONG-MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(MAX_RANGE_LONG - MIN_RANGE_LONG) * LINE_SCALE_LONG))
 
 # left
-X=CANV_WIDTH/4
-Y=CANV_HEIGHT/2
+X = CANV_WIDTH / 4
+Y = CANV_HEIGHT / 2
 sensors.append(location(id=4, x=X, y=Y, 
-                        x1=X-SHORT_ARC_BOX, y1=Y-SHORT_ARC_BOX, 
-                        x2=X+SHORT_ARC_BOX, y2=Y+SHORT_ARC_BOX,
+                        x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
+                        x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=90,arcLength=180, 
-                        arcWidth=(MAX_RANGE_SHORT-MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
 
 # right
-X=CANV_WIDTH/4*3
-Y=CANV_HEIGHT/2
+X = CANV_WIDTH / 4 * 3
+Y = CANV_HEIGHT / 2
 sensors.append(location(id=5, x=X, y=Y, 
-                        x1=X-SHORT_ARC_BOX, y1=Y-SHORT_ARC_BOX, 
-                        x2=X+SHORT_ARC_BOX, y2=Y+SHORT_ARC_BOX,
+                        x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
+                        x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=270,arcLength=180, 
-                        arcWidth=(MAX_RANGE_SHORT-MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
 
 # back left
-X=CANV_WIDTH/4
-Y=CANV_HEIGHT/4*3
+X = CANV_WIDTH / 4
+Y = CANV_HEIGHT / 4 * 3
 sensors.append(location(id=6, x=X, y=Y, 
-                        x1=X-SHORT_ARC_BOX, y1=Y-SHORT_ARC_BOX, 
-                        x2=X+SHORT_ARC_BOX, y2=Y+SHORT_ARC_BOX,
+                        x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
+                        x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(MAX_RANGE_SHORT-MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
-Y=CANV_HEIGHT/4*3 + 40
+                        arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+Y = CANV_HEIGHT / 4 * 3 + 40
 sensors.append(location(id=7, x=X, y=Y, 
-                        x1=X-LONG_ARC_BOX, y1=Y-LONG_ARC_BOX, 
-                        x2=X+LONG_ARC_BOX,y2=Y+LONG_ARC_BOX,
+                        x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
+                        x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(MAX_RANGE_LONG-MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(MAX_RANGE_LONG - MIN_RANGE_LONG) * LINE_SCALE_LONG))
 
 # back right
-X=CANV_WIDTH/4*3
-Y=CANV_HEIGHT/4*3
+X = CANV_WIDTH / 4 * 3
+Y = CANV_HEIGHT / 4 * 3
 sensors.append(location(id=8, x=X, y=Y, 
-                        x1=X-SHORT_ARC_BOX, y1=Y-SHORT_ARC_BOX, 
-                        x2=X+SHORT_ARC_BOX, y2=Y+SHORT_ARC_BOX,
+                        x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
+                        x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(MAX_RANGE_SHORT-MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
 
-Y=CANV_HEIGHT/4*3 + 40
+Y = CANV_HEIGHT / 4 * 3 + 40
 sensors.append(location(id=9, x=X, y=Y, 
-                        x1=X-LONG_ARC_BOX, y1=Y-LONG_ARC_BOX, 
-                        x2=X+LONG_ARC_BOX,y2=Y+LONG_ARC_BOX,
+                        x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
+                        x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(MAX_RANGE_LONG-MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(MAX_RANGE_LONG - MIN_RANGE_LONG) * LINE_SCALE_LONG))
 
 # global variables
 gui = None
@@ -119,11 +121,11 @@ class manualControl:
         self.w = mainWindow
 
         self.canvas = tk.Canvas(mainWindow, width=CANV_WIDTH, height=CANV_HEIGHT, background='white')
-        self.canvas.grid(row=0, column=1 )
+        self.canvas.grid(row=0, column=1)
         self.canvas.create_text(sensors[0].x,sensors[0].y + 25,text="Front Left")
         self.canvas.create_text(sensors[2].x,sensors[2].y + 25,text="Front Right")
-        self.canvas.create_text(sensors[4].x+40 ,sensors[4].y,text="Left")
-        self.canvas.create_text(sensors[5].x-40,sensors[5].y,text="Right")
+        self.canvas.create_text(sensors[4].x + 40 ,sensors[4].y,text="Left")
+        self.canvas.create_text(sensors[5].x - 40,sensors[5].y,text="Right")
         self.canvas.create_text(sensors[6].x,sensors[6].y - 25,text="Back Left")
         self.canvas.create_text(sensors[8].x,sensors[8].y - 25,text="Back Right")
         
@@ -225,7 +227,7 @@ class manualControl:
         self.btnSensorTest.grid(row = 95, column = 1, columnspan=1)
 
 
-        # heart beat blinker                
+        # heart beat blinker
         self.lblHeartBeat = tk.Label(frame, text="Heart Beat", fg="red")
         self.lblHeartBeat.grid(row = 100, column = 0, columnspan = 2, pady=10)
 
@@ -239,19 +241,18 @@ class manualControl:
 
         cartControl.obstacleInfo = []
 
-        if sensorID == None: 
+        if sensorID is None: 
             r = cartControl.NUM_DISTANCE_SENSORS - 1
         else:
             r = sensorID
 
-        for i in range(r, r+1):
+        for i in range(r, r + 1):
             s = cartControl.distanceSensors[i]
             d = cartControl.distanceList[i]
             sensor = sensors[i]
 
             # show valid range of distance measures
-            self.canvas.create_arc(
-                sensor.x1, sensor.y1, sensor.x2, sensor.y2,
+            self.canvas.create_arc(sensor.x1, sensor.y1, sensor.x2, sensor.y2,
                 start=sensor.arcFrom, extent=sensor.arcLength, style=tk.ARC, width=sensor.arcWidth, outline="snow3")
 
             if s.get('range') == 'long': 
@@ -267,7 +268,7 @@ class manualControl:
 
                 # line color depends on distance value
 
-                age = time.time()- s.get('timestamp')
+                age = time.time() - s.get('timestamp')
 
                 # limit line length
                 if d[k] < 40:
@@ -275,7 +276,7 @@ class manualControl:
                 else:
                     lineLength = 40
 
-                if lineLength < minRange or lineLength> maxRange:
+                if lineLength < minRange or lineLength > maxRange:
                     cartControl.obstacleInfo.append({'direction': s.get('direction'), 'position': s.get('position')})
 
                     if age > 2:
@@ -295,11 +296,12 @@ class manualControl:
                 try:
                     self.canvas.create_line(sensor.x, sensor.y, sensor.x + xOffset, sensor.y + yOffset, fill=col)
                 except:
-                    print("ERROR: sensor.x,.y: " + str(sensor.x) + ", " + str(sensor.y))
+                    cartGlobal.log("ERROR: sensor.x,.y: " + str(sensor.x) + ", " + str(sensor.y))
 
     def selectedDirection(self, value):
         self.direction = self.choices.index(value)
-        #println("selected direction: " + value + " index: " + self.direction)
+        #cartGlobal.logln("selected direction: " + value + " index: " +
+        #self.direction)
 
     def selectedServo(self, value):
         self.servoID = self.servoChoices.index(value)
@@ -319,7 +321,7 @@ class manualControl:
 
     def checkStatus(self):
     
-        if cartControl.arduinoStatus == 1:
+        if cartGlobal.arduinoStatus == 1:
             self.lblInfo.configure(text = "cart ready", bg="lawn green", fg="black")
             self.btnRotate.configure(state="normal")
             self.btnMove.configure(state="normal")
@@ -333,7 +335,7 @@ class manualControl:
     def navigateTo(self):
         start = time.time()
         PathFinder.analyze((int(self.sbX.get()),int(self.sbY.get())))
-        print ("analyzed in: ", time.time()-start, " seconds.")
+        cartGlobal.log("analyzed in: ", time.time() - start, " seconds.")
         self.w.update_idletasks()
     
 
@@ -347,7 +349,7 @@ class manualControl:
 
         arduino.sendHeartbeat()
         arduino.getCartOrientation()
-        self.lblRotationCurrentValue.configure(text=str(cartControl.orientation))
+        self.lblRotationCurrentValue.configure(text=str(cartGlobal.getOrientation()))
         self.w.update_idletasks()
         self.w.after(500, self.heartBeat)   # heart beat loop
         
@@ -360,9 +362,10 @@ class manualControl:
         self.lblCommand.configure(text="Stop")
         self.w.update_idletasks()
     
-    def moveCart(self, speed = 50):
+    def moveCart(self, speed=200, distance=100):
 
-        arduino.sendMoveCommand(self.direction, speed)
+        cartGlobal.log(f"moveCart, speed: {speed}, distance: {distance}")
+        arduino.sendMoveCommand(self.direction, speed, distance)
         self.lblCommandValue.configure(text="Move")
         #self.lblMove.configure(text=str(speed))
         self.w.update_idletasks()
@@ -379,7 +382,7 @@ class manualControl:
         relAngle = int(self.sbRotation.get())
 
         self.lblCommandValue.configure(text="Rotate")
-        targetOrientation = (360 + cartControl.orientation - relAngle) % 360
+        targetOrientation = (360 + cartGlobal.getOrientation() - relAngle) % 360
         self.lblRotationTargetValue.configure(text=str(targetOrientation))
         arduino.sendRotateCommand(relAngle)
         self.w.update_idletasks()
@@ -404,12 +407,12 @@ def startGui():
     global gui
     global controller
 
-    start=time.time()
+    start = time.time()
     gui = tk.Tk()
-    gui.geometry('600x600+100+150')     # window size and position
+    gui.geometry('600x600+1100+100')     # window size and position
 
     controller = manualControl(gui)
-    #print "gui initialized in: ", time.time()-start, " seconds"
+    #cartGlobal.log "gui initialized in: ", time.time()-start, " seconds"
     gui.mainloop()
 
     pass

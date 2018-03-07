@@ -76,11 +76,11 @@ def readMessages():
                 cartGlobal.log("!A5 cart stopped received from Arduino")
 
             elif msgID == "!A9":    # orientation x:":
-                #!A5,<orientation>
-                newOrientation = float(recv.split(",")[1])
+                #!A9,<orientation>
+                newOrientation = round(float(recv.split(",")[1]))
 
                 # test for change of orientation
-                if int(cartGlobal.getOrientation()) != int(newOrientation):
+                if  cartGlobal.getOrientation() != newOrientation:
                     cartGlobal.setOrientation(newOrientation)
                     cartGlobal.log(f"new cart orientation: {newOrientation}")
 
@@ -104,7 +104,7 @@ def readMessages():
                 except:
                     cartGlobal.log(f"Unexpected error on reading messages: {sys.exc_info()[0]}")
 
-            time.sleep(0.05)    # give other threads a chance
+            time.sleep(0.001)    # give other threads a chance
 
 
 def sendMoveCommand(direction, speed, distance):
@@ -120,14 +120,14 @@ def sendMoveCommand(direction, speed, distance):
 
 def sendRotateCommand(relAngle):
 
-    if relAngle > 0:   # rotate anticlock
-        msg = bytes(str(abs(relAngle)+3000)+'\n', 'ascii')
-        cartGlobal.log("Send rotate " + str(msg))
+    if relAngle > 0:   # rotate counterclock
+        msg = bytes(str(abs(relAngle)+2000)+'\n', 'ascii')
+        cartGlobal.log("Send rotate counterclock " + str(msg))
         ser.write(msg) 
 
     if relAngle < 0:
-        msg = bytes(str(abs(relAngle)+2000)+'\n', 'ascii')
-        cartGlobal.log("Send rotate " + str(msg))
+        msg = bytes(str(abs(relAngle)+3000)+'\n', 'ascii')
+        cartGlobal.log("Send rotate clockwise" + str(msg))
         ser.write(msg) 
 
     cartGlobal.setMovementBlocked(False)

@@ -95,7 +95,7 @@ def setOrientation(new):
 
     global _orientation
 
-    _orientation = new
+    _orientation = round(new)
 
     
 def getOrientation():

@@ -172,6 +172,9 @@ class manualControl:
         self.sbRotation = tk.Spinbox(frame, from_=-90, to=90, width=3)
         self.sbRotation.grid(row = 50, column = 0, padx=50, pady=20, sticky=tk.E)
 
+        self.lblRotationHelp1 = tk.Label(frame, text="+ counterclock / - clockwise")
+        self.lblRotationHelp1.grid(row = 48, column = 0, sticky=tk.E)
+
         self.btnRotate = tk.Button(frame, text="Rotate", state="disabled", command=self.rotateCart)
         self.btnRotate.grid(row = 50, column = 1)
         
@@ -328,6 +331,7 @@ class manualControl:
             self.btnNav.configure(state="normal")
             self.w.update_idletasks()
             self.w.after(10, self.heartBeat)
+            arduino.getCartOrientation()
         else:
             self.w.after(400, self.checkStatus)
       
@@ -362,7 +366,7 @@ class manualControl:
         self.lblCommand.configure(text="Stop")
         self.w.update_idletasks()
     
-    def moveCart(self, speed=200, distance=100):
+    def moveCart(self, speed=250, distance=100):
 
         cartGlobal.log(f"moveCart, speed: {speed}, distance: {distance}")
         arduino.sendMoveCommand(self.direction, speed, distance)
@@ -382,7 +386,7 @@ class manualControl:
         relAngle = int(self.sbRotation.get())
 
         self.lblCommandValue.configure(text="Rotate")
-        targetOrientation = (360 + cartGlobal.getOrientation() - relAngle) % 360
+        targetOrientation = (cartGlobal.getOrientation() + relAngle) % 360
         self.lblRotationTargetValue.configure(text=str(targetOrientation))
         arduino.sendRotateCommand(relAngle)
         self.w.update_idletasks()

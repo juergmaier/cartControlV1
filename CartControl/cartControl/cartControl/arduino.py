@@ -8,18 +8,27 @@ import cartGlobal
 
 ser = None
 
+
 def initSerial(comPort):
+
     global ser
-  
+    
+    cartGlobal.arduinoStatus = 0
+
     while True:
         try:
-            ser = serial.Serial(port=comPort, baudrate=115200, timeout=2)
+            ser = serial.Serial(comPort)
+            # try to reset the arduino
+            ser.setDTR(False)
+            time.sleep(0.1)
+            ser.setDTR(True)
+            ser.baudrate = 115200
             cartGlobal.log("Serial comm to arduino established")
-            break
+            return
 
         except:
-            cartGlobal.log("exception on serial connect with " + comPort)
-            time.sleep(1)
+            cartGlobal.log(f"exception on serial connect with {comPort} {sys.exc_info()[0]}")
+            time.sleep(3)
 
 #####################################
 # readMessages runs in its own thread
@@ -57,14 +66,20 @@ def readMessages():
 
             elif msgID == "!A2":    #"obstacle:":
                 #!A2,<distance>
-                distance = float(recv.split(",")[1])
+                try:
+                    distance = float(recv.split(",")[1])
+                except:
+                    cartGlobal.log(f"exception with message: {recv[:-2]}")
                 cartGlobal.setMovementBlocked(True)
                 gui.controller.updateDistanceSensorObstacle(distance)
 
 
             elif msgID == "!A3":    #"abyss:":
-                #!A4,<distance>
-                distance = float(recv.split(",")[1])
+                #!A3,<distance>
+                try:
+                    distance = float(recv.split(",")[1])
+                except:
+                    cartGlobal.log(f"exception with message: {recv[:-2]}")
                 cartGlobal.setMovementBlocked(True)
                 gui.controller.updateDistanceSensorAbyss(distance)
 
@@ -93,29 +108,31 @@ def readMessages():
                     blocked, startTime = cartGlobal.getMovementBlocked()
                     if blocked:
                         if time.time() - startTime > 3:
-                            if cartGlobal.getCartMoving():
+                            if cartGlobal.isCartMoving():
                                 cartGlobal.log("cart stopped by MovementBlocked")
                                 sendStopCommand()
                                 cartGlobal.setMovementBlocked(False)
                         
             else:
                 try:
-                    cartGlobal.log("<-A " + recv)
+                    cartGlobal.log("<-A " + recv[:-2])
                 except:
                     cartGlobal.log(f"Unexpected error on reading messages: {sys.exc_info()[0]}")
 
             time.sleep(0.001)    # give other threads a chance
 
 
-def sendMoveCommand(direction, speed, distance):
+def sendMoveCommand(direction, speed, distanceMm):
 
-    cartGlobal.setCartMoveDistance(distance)
-    duration = ((distance / speed) * 10000) + 1000
+    cartGlobal.setCartMoveDistance(distanceMm)
+    duration = ((distanceMm / speed) * 2000) + 1000
     moveMsg = bytes('1' + str(direction) + str(speed).zfill(3) + str(int(duration)).zfill(4) + '\n', 'ascii')
-    cartGlobal.log(f"Send move {moveMsg}")
     ser.write(moveMsg) 
+
     cartGlobal.setMovementBlocked(False)
     cartGlobal.setCartMoving(True)
+
+    cartGlobal.log(f"Send move {moveMsg}, speed: {int(speed)}, distance: {distanceMm}, duration: {duration}")
 
 
 def sendRotateCommand(relAngle):
@@ -152,7 +169,7 @@ def getCartOrientation():
 
 def sendReadSensorCommand(sensorID):
 
-    msg = b'7' + bytes(sensorID) + b'\n'
+    msg = b'7' + bytes(str(sensorID),'ascii') + b'\n'
     cartGlobal.log("Send readSensor " + str(msg))
     ser.write(msg) 
 

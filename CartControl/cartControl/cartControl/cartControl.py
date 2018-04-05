@@ -9,7 +9,8 @@ import arduino
 import cartGlobal
 import odometry
 
-CART_PORT = 20002
+CART_PORT = 20003
+
 lastMessage = time.time()
 TIMEOUT = 5                 # stop cart when navManager stopped
 obstacleInfo = []
@@ -49,51 +50,51 @@ distanceSensors.append({'sensorID': 9, 'direction':'backward', 'position':'right
     'timestamp':time.time(), 'valueIndex':(3,1), 'installed': True, 'servoIndex':4, 'color':'blue', 'rotation':0})
 
 distanceList = np.zeros((NUM_DISTANCE_SENSORS, NUM_MEASUREMENTS_PER_SCAN))
-                        
 
-class cartCommands(rpyc.Service):
 
-    def exposed_echo(self, text):
-        return text + " from cartControl"
+def cartInit(logIP, logPort):                       
+    '''
+    a first call from navManager
+    '''
+    if not cartGlobal.simulateLogger:
+        try:
+            cartGlobal.navManager = rpyc.connect(logIP, logPort)
+            cartGlobal.navManager.root.connectionStatus("cart", True)
+            cartGlobal.log("logger connection established")
 
-    def exposed_rotateRelative(self, angle):
-        cartGlobal.log(f"exposed_rotateRelative, angle: {angle}")
-        arduino.sendRotateCommand(int(angle))
-        gui.controller.updateTargetRotation(cartGlobal.getOrientation() + int(angle))
-        
-    def exposed_move(self, direction, speed, distance=10):
-        cartGlobal.log(f"exposed_move, direction: {direction}, speed: {speed}, distance: {distance}")
-        arduino.sendMoveCommand(direction, speed, distance)
+        except:
+            print("cart - could not establish connection to logger")
+            raise SystemExit()
 
-    def exposed_stop(self):
-        cartGlobal.log("exposed_stop")
-        gui.controller.stopCart()
+    import threading
 
-    def exposed_requestCartOrientation(self):
-        return str(cartGlobal.getOrientation())
+    cartGlobal.setMovementBlocked(False)
 
-    def exposed_heartBeat(self):
-        global lastMessage
-        continue_pygame_loop()
+    guiThread = threading.Thread(target=gui.startGui, args={})
+    guiThread.start()
+    cartGlobal.log("cart gui started")
 
-        # watchdog for incoming commands from navManager
-        # stop cart if we do not get regular messages
-        currTime = int(round(time.time() * 1000))
-        cartGlobal.log(currTime - lastMessage)
-        if currTime - lastMessage > TIMEOUT:
-            if cartGlobal.getCartMoving:
-                arduino.sendStopCommand()
+    msgThread = threading.Thread(target=arduino.readMessages, args={})
+    cartGlobal.log("start msg reader cart-arduino")
+    msgThread.start()
+    
+    camThread = threading.Thread(target=odometry.trackCartMovements, args={})
+    cartGlobal.log("start cart tracker")
+    camThread.start()
+
+    cartGlobal.log("gui, message and odometer threads startet")
+
+    # wait for arduino ready
+    cartGlobal.log("wait for arduino")
+    while True:
+        if cartGlobal.arduinoStatus == 1:
+            cartGlobal.log("arduino ready")
+            break
         else:
-            arduino.sendHeartbeat()
-            cartGlobal.log("arduino Heartbeat sent")
+            time.sleep(0.5)
 
-        lastMessage = int(round(time.time() * 1000))
-
-    def exposed_getObstacleInfo(self):
-        return obstacleInfo
-
-    def exposed_getCartInfo(self):
-        return cartGlobal.getOrientation(), cartGlobal.currPosX, cartGlobal.currPosY, cartGlobal.getCartMoving()
+    if not cartGlobal.simulateLogger:
+        cartGlobal.navManager.root.processStatus("cart",True)
 
 
 
@@ -119,28 +120,63 @@ def updateDistances(Values):
             distanceSensors[sensorID][key] = time.time()
 
 
+
+
+class cartCommands(rpyc.Service):
+
+    def exposed_startListening(self, navIP, navPort):
+        cartInit(navIP, navPort)
+  
+    def exposed_rotateRelative(self, angle):
+        cartGlobal.log(f"exposed_rotateRelative, angle: {angle}")
+        arduino.sendRotateCommand(int(angle))
+        gui.controller.updateTargetRotation(cartGlobal.getOrientation() + int(angle))
+        
+    def exposed_move(self, direction, speed, distance=10):
+        cartGlobal.log(f"exposed_move, direction: {direction}, speed: {speed}, distance: {distance}")
+        arduino.sendMoveCommand(direction, speed, distance)
+
+    def exposed_stop(self):
+        cartGlobal.log("exposed_stop")
+        gui.controller.stopCart()
+
+    def exposed_requestCartOrientation(self):
+        return str(cartGlobal.getOrientation())
+
+    def exposed_heartBeat(self):
+        global lastMessage
+        continue_pygame_loop()
+
+        # watchdog for incoming commands from navManager
+        # stop cart if we do not get regular messages
+        currTime = int(round(time.time() * 1000))
+        cartGlobal.log(currTime - lastMessage)
+        if currTime - lastMessage > TIMEOUT:
+            if cartGlobal.isCartMoving:
+                arduino.sendStopCommand()
+        else:
+            arduino.sendHeartbeat()
+            cartGlobal.log("arduino Heartbeat sent")
+
+        lastMessage = int(round(time.time() * 1000))
+
+    def exposed_getObstacleInfo(self):
+        return obstacleInfo
+
+    def exposed_getCartInfo(self):
+        return cartGlobal.getOrientation(), cartGlobal.currPosX, cartGlobal.currPosY, cartGlobal.getCartMoving()
+
+
+
 if __name__ == '__main__':
 
-    import threading
-
-    # Logging
-    cartGlobal.startlog()
-    cartGlobal.setMovementBlocked(False)
-
-    guiThread = threading.Thread(target=gui.startGui, args={})
-    guiThread.start()
-    cartGlobal.log("cart gui started")
-
-    msgThread = threading.Thread(target=arduino.readMessages, args={})
-    cartGlobal.log("start msg reader cart-arduino")
-    msgThread.start()
-    
-    camThread = threading.Thread(target=odometry.trackCartMovements, args={})
-    cartGlobal.log("start cart tracker")
-    camThread.start()
+    if cartGlobal.simulateLogger:
+        print("cart - standalone without navManager")
+        cartInit(0,0)
+    else: 
+        print("cart - wait for message from navManager ...")
 
     from rpyc.utils.server import ThreadedServer
     t = ThreadedServer(cartCommands, port=CART_PORT)
-    cartGlobal.log("start cart rpyc listener")
     t.start()
 

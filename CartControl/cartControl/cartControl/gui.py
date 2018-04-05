@@ -37,13 +37,13 @@ X = CANV_WIDTH / 4
 Y = CANV_HEIGHT / 4
 sensors.append(location(id=0, x=X, y=Y, 
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
-                        x2=X + SHORT_ARC_BOX,y2=Y + SHORT_ARC_BOX,
+                        x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=0,arcLength=180, 
                         arcWidth=(MAX_RANGE_SHORT - MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
 Y = CANV_HEIGHT / 4 - 40
 sensors.append(location(id=1, x=X, y=Y, 
                         x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
-                        x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
+                        x2=X + LONG_ARC_BOX, y2=Y + LONG_ARC_BOX,
                         arcFrom=0,arcLength=180, 
                         arcWidth=(MAX_RANGE_LONG - MIN_RANGE_LONG) * LINE_SCALE_LONG))
 
@@ -58,7 +58,7 @@ sensors.append(location(id=2, x=X, y=Y,
 Y = CANV_HEIGHT / 4 - 40
 sensors.append(location(id=3, x=X, y=Y, 
                         x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
-                        x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
+                        x2=X + LONG_ARC_BOX, y2=Y + LONG_ARC_BOX,
                         arcFrom=0,arcLength=180, 
                         arcWidth=(MAX_RANGE_LONG - MIN_RANGE_LONG) * LINE_SCALE_LONG))
 
@@ -139,6 +139,9 @@ class manualControl:
         self.lblInfo = tk.Label(frame, text="wait for Arduino button pressed", fg ="white", bg="red")
         self.lblInfo.grid(row=1, columnspan=2)
 
+
+        # informational elements
+        ##########################
         self.lblDistanceObstacle = tk.Label(frame, text="distance to obstacle: ")
         self.lblDistanceObstacle.grid(row = 20, column = 0, sticky=tk.E)
 
@@ -168,15 +171,44 @@ class manualControl:
 
         self.lblRotationCurrentValue = tk.Label(frame, text=" ")
         self.lblRotationCurrentValue.grid(row = 40, column = 1)
+
+
+        # rotate
+        ######################################
+        self.separator1 = tk.Frame(frame, height=3, bd=2, relief=tk.SUNKEN)
+        self.separator1.grid(row=45, column=0, columnspan=2, pady=10, sticky="we")
+
+        self.lblRotationHelp1 = tk.Label(frame, text="+ counterclock")
+        self.lblRotationHelp1.grid(row = 50, column = 0, sticky=tk.E)
         
         self.sbRotation = tk.Spinbox(frame, from_=-90, to=90, width=3)
-        self.sbRotation.grid(row = 50, column = 0, padx=50, pady=20, sticky=tk.E)
+        self.sbRotation.grid(row = 50, column = 1, padx=10, pady=0, sticky=tk.W)
 
-        self.lblRotationHelp1 = tk.Label(frame, text="+ counterclock / - clockwise")
-        self.lblRotationHelp1.grid(row = 48, column = 0, sticky=tk.E)
+        self.lblRotationHelp2 = tk.Label(frame, text="- clockwise")
+        self.lblRotationHelp2.grid(row = 52, column = 0, sticky=tk.E)
 
         self.btnRotate = tk.Button(frame, text="Rotate", state="disabled", command=self.rotateCart)
-        self.btnRotate.grid(row = 50, column = 1)
+        self.btnRotate.grid(row = 52, column = 1, padx=10, sticky=tk.W)
+
+
+        # move
+        #########################################
+        self.separator2 = tk.Frame(frame, height=3, bd=2, relief=tk.SUNKEN)
+        self.separator2.grid(row=59, column=0, columnspan=2, pady=10, sticky="we")
+
+        self.lblDistValue = tk.Label(frame, text="Distance [mm]: ")
+        self.lblDistValue.grid(row = 60, column = 0, pady=0, sticky=tk.E)
+
+        self.sbDist = tk.Spinbox(frame, from_=0, to=4000, width=4)
+        self.sbDist.grid(row = 60, column = 1, padx=10, sticky=tk.W)
+        self.sbDist.insert(0, 50)
+
+        self.lblSpeedValue = tk.Label(frame, text="Speed: ")
+        self.lblSpeedValue.grid(row = 62, column = 0, pady=0, sticky=tk.E)
+
+        self.sbSpeed = tk.Spinbox(frame, from_=0, to=250, width=3)
+        self.sbSpeed.grid(row = 62, column = 1, padx=10, sticky=tk.W)
+        self.sbSpeed.insert(0,20)
         
         self.choices = ["stop","forward","for_diag_right","for_diag_left","left","right","backward","back_diag_right","back_diag_left"]
         defaultDirection = "forward"
@@ -185,38 +217,40 @@ class manualControl:
         move = tk.StringVar(gui)
         move.set(defaultDirection)
         self.ddMove = tk.OptionMenu(frame, move, *self.choices, command=self.selectedDirection)
-        self.ddMove.grid(row = 60, column = 0, sticky=tk.E)
+        self.ddMove.grid(row = 64, column = 0, sticky=tk.E)
 
         self.btnMove = tk.Button(frame, text="Move", state="disabled", command = self.moveCart)
-        self.btnMove.grid(row = 60, column = 1) 
+        self.btnMove.grid(row = 64, column = 1, padx=10, sticky=tk.W) 
+
+
+        # navigate
+        ############################################
+        self.separator3 = tk.Frame(frame, height=3, bd=2, relief=tk.SUNKEN)
+        self.separator3.grid(row=79, column=0, columnspan=2, pady=10, sticky="we")
         
         self.lblXValue = tk.Label(frame, text="X: ")
-        self.lblXValue.grid(row = 80, column = 0, pady=10, sticky=tk.E)
+        self.lblXValue.grid(row = 80, column = 0, pady=0, sticky=tk.E)
 
         self.sbX = tk.Spinbox(frame, from_=0, to=400, text = "300", width=3)
-        self.sbX.grid(row = 80, column = 1, sticky=tk.W)
+        self.sbX.grid(row = 80, column = 1, padx=10, sticky=tk.W)
         self.sbX.insert(0, 30)
 
         self.lblYValue = tk.Label(frame, text="Y: ")
         self.lblYValue.grid(row = 82, column = 0, sticky=tk.E)
 
         self.sbY = tk.Spinbox(frame, from_=0, to=400, width=3)
-        self.sbY.grid(row = 82, column = 1, sticky=tk.W)
+        self.sbY.grid(row = 82, column = 1, padx=10, sticky=tk.W)
         self.sbY.insert(0, 34)
 
-        self.btnNav = tk.Button(frame, text="navigate", state="normal", command = self.navigateTo)
-        self.btnNav.grid(row = 84, column = 1)
+        self.btnNav = tk.Button(frame, text="Navigate", state="normal", command=self.navigateTo)
+        self.btnNav.grid(row = 84, column = 1, padx=10, sticky=tk.W)
 
-        self.servoChoices = ["VL","VR","LM","RM","HL","HR"]
-        defaultServo = "VL"
-        self.servoID = self.servoChoices.index(defaultServo)
-
-        testServo = tk.StringVar(gui)
-        testServo.set(defaultServo)
-        self.ddServo = tk.OptionMenu(frame, testServo, *self.servoChoices, command=self.selectedServo)
-        self.ddServo.grid(row = 90, column = 0, sticky=tk.E)
 
         # sensor test
+        ##############
+        self.separator4 = tk.Frame(frame, height=3, bd=2, relief=tk.SUNKEN)
+        self.separator4.grid(row=90, column=0, columnspan=2, pady=10, sticky="we")
+
         self.sensorTestChoices = ["forward","left","right", "backward"]
         defaultSensorTest = "forward"
         self.sensorTest = self.sensorTestChoices.index(defaultSensorTest)
@@ -227,15 +261,15 @@ class manualControl:
         self.ddSensor.grid(row = 95, column = 0, sticky=tk.E)
 
         self.btnSensorTest = tk.Button(frame, text="Test Sensors", state="normal", command = self.testSensor)
-        self.btnSensorTest.grid(row = 95, column = 1, columnspan=1)
+        self.btnSensorTest.grid(row = 95, column = 1, padx=10, sticky=tk.W)
 
 
-        # heart beat blinker
+        # heartbeat blinker
         self.lblHeartBeat = tk.Label(frame, text="Heart Beat", fg="red")
         self.lblHeartBeat.grid(row = 100, column = 0, columnspan = 2, pady=10)
 
         self.btnStop = tk.Button(frame, text="STOP CART", state="normal", command = self.stopCart, bg = "red", fg = "white")
-        self.btnStop.grid(row = 200, column = 0, columnspan=2, pady=30)
+        self.btnStop.grid(row = 200, column = 0, columnspan=2, pady=0)
 
         self.startArduino()
         
@@ -253,6 +287,17 @@ class manualControl:
             s = cartControl.distanceSensors[i]
             d = cartControl.distanceList[i]
             sensor = sensors[i]
+
+            # clear area
+            col = "white"
+            if sensor.id < 4:
+                self.canvas.create_rectangle(sensor.x1-20, sensor.y1-10, sensor.x2+20, sensor.y, fill=col, outline=col)
+            if sensor.id > 5:
+                self.canvas.create_rectangle(sensor.x1-20, sensor.y, sensor.x2+20, sensor.y + 40, fill=col, outline=col)
+            if sensor.id == 4:
+                self.canvas.create_rectangle(sensor.x1-20, sensor.y-40, sensor.x, sensor.y + 40, fill=col, outline=col)
+            if sensor.id == 5:
+                self.canvas.create_rectangle(sensor.x, sensor.y-40, sensor.x+20, sensor.y + 40, fill=col, outline=col)
 
             # show valid range of distance measures
             self.canvas.create_arc(sensor.x1, sensor.y1, sensor.x2, sensor.y2,
@@ -306,14 +351,15 @@ class manualControl:
         #cartGlobal.logln("selected direction: " + value + " index: " +
         #self.direction)
 
-    def selectedServo(self, value):
-        self.servoID = self.servoChoices.index(value)
+    #def selectedServo(self, value):
+    #    self.servoID = self.servoChoices.index(value)
 
     def selectedSensorTest(self, value):
         self.sensorTest = self.sensorTestChoices.index(value)
 
     def startArduino(self):
 
+        cartGlobal.log("try to open serial connection to arduino on cart (COM5)")
         arduino.initSerial("COM5")
         self.lblInfo.configure(text = "arduino connected, waiting for cart ready message", bg="white smoke", fg="orange")
         self.btnArduino.configure(state = "disabled")
@@ -363,11 +409,13 @@ class manualControl:
     def stopCart(self):
 
         arduino.sendStopCommand()
-        self.lblCommand.configure(text="Stop")
+        self.lblCommandValue.configure(text="Stop")
         self.w.update_idletasks()
     
-    def moveCart(self, speed=250, distance=100):
+    def moveCart(self):
 
+        speed = int(self.sbSpeed.get())
+        distance = int(self.sbDist.get())
         cartGlobal.log(f"moveCart, speed: {speed}, distance: {distance}")
         arduino.sendMoveCommand(self.direction, speed, distance)
         self.lblCommandValue.configure(text="Move")

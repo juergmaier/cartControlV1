@@ -125,14 +125,17 @@ def doOdometry():
                     if cartGlobal.checkMoveDistanceReached():
 
                         arduino.sendStopCommand()
-                        cartGlobal.log(f"move distance reached: distance {cartGlobal._moveDistance}, start x/y: {cartGlobal._moveStartX}/{cartGlobal._moveStartY}, curr x/y: {cartGlobal.currPosXmm}/{cartGlobal.currPosYmm}")
+                        cartGlobal.log(f"move distance reached: distance {cartGlobal._moveDistance}, \
+                        start x/y: {cartGlobal._moveStartX}/{cartGlobal._moveStartY}, \
+                        curr x/y: {cartGlobal.currPosX}/{cartGlobal.currPosY}, \
+                        move time: {time.time() - cartGlobal._moveStartTime:.2f}")
 
             # use new image as last one
             img1bw = img2bw
             kps1 = kps2
             des1 = des2
 
-            #cartGlobal.log(f"time used for frame comparison {time.time()-start}")
+            #cartGlobal.log(f"time used for frame comparison {time.time()-start:.4f}")
 
         cartGlobal.log("odometry, cartMoving == False")
 
@@ -164,12 +167,12 @@ def trackCartMovements():
             camConnected = True
 
             # Initiate ORB detector (fastThreshold has highest impact on number of candidate points seen)
-            orb = cv2.ORB_create(nfeatures=150, edgeThreshold=8, patchSize=15, fastThreshold=6,  scoreType=cv2.ORB_FAST_SCORE)
+            orb = cv2.ORB_create(nfeatures=150, edgeThreshold=5, patchSize=15, fastThreshold=6,  scoreType=cv2.ORB_FAST_SCORE)
     
             # create BFMatcher object
             bf = cv2.BFMatcher()
     
-            # remove tracking failure-jpg's
+            # remove tracking jpg's
             for imgFile in glob.glob("C:/cartControl/floorImages/*.jpg"):
                 os.remove(imgFile)
 

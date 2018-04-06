@@ -13,6 +13,7 @@ _moveDistance = 0
 _moveStartX = 0
 _moveStartY = 0
 _orientation = 0
+_moveStartTime = None
 
 # Values in mm
 currPosX = 0
@@ -22,9 +23,9 @@ lastDistance = 0
 arduinoStatus = 0
 
 # pixel-width in mm at 13 cm distance from ground
-pix2mmX = 85.0 / 320
+pix2mmX = 0.7
 # pixel-height at 13 cm distance from ground
-pix2mmY = 65.0 / 240
+pix2mmY = 0.7
 
 frameNr = 0
 
@@ -53,12 +54,13 @@ def saveImg(img):
 
 def setCartMoveDistance(distanceMm):
 
-    global _moveDistance, _moveStartX, _moveStartY, lastDistanceMm
+    global _moveDistance, _moveStartX, _moveStartY, lastDistance, _moveStartTime
 
     _moveDistance = distanceMm
     _moveStartX = currPosX
     _moveStartY = currPosY
     lastDistance = 0
+    _moveStartTime = time.time()
     
 
 def checkMoveDistanceReached():
@@ -67,7 +69,7 @@ def checkMoveDistanceReached():
     dy = np.abs(currPosY - _moveStartY)
 
     dist = np.hypot(dx, dy)
-    log(f"moveDistance requested {_moveDistance}, moveDistance current {int(dist)}")
+    #log(f"moveDistance requested {_moveDistance}, moveDistance current {int(dist)}, moveTime: {time.time() - _moveStartTime:.2f}")
 
     return dist >= _moveDistance
 
@@ -131,14 +133,15 @@ def updateCartPosition(dx, dy):
 
     global currPosX, currPosY, lastDistance
 
-    currPosX += dx
-    currPosY += dy
+    currPosX += int(dx)
+    currPosY += int(dy)
 
     dxMoved = np.abs(currPosX - _moveStartX)
     dyMoved = np.abs(currPosY - _moveStartY)
-    currDistance = np.sqrt(np.power(dxMoved, 2) + np.power(dyMoved, 2))
-    if currDistance > lastDistance+10:
-        log(f"dx {dx:5.0f} dy {dy:5.0f}  currPosX {currPosX:5.0f}  currPosY {currPosY:5.0f}")
+    currDistance = np.hypot(dxMoved, dyMoved)
+
+    if currDistance > lastDistance+20:
+        log(f"dx: {dx:5.0f} dy: {dy:5.0f}  currPosX {currPosX:5.0f}  currPosY {currPosY:5.0f}, moveTime: {time.time() - _moveStartTime:.2f}")
         lastDistance = currDistance
 
 

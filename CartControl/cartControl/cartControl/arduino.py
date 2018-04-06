@@ -125,7 +125,7 @@ def readMessages():
 def sendMoveCommand(direction, speed, distanceMm):
 
     cartGlobal.setCartMoveDistance(distanceMm)
-    duration = ((distanceMm / speed) * 2000) + 1000
+    duration = ((distanceMm / speed) * 2500) + 1000
     moveMsg = bytes('1' + str(direction) + str(speed).zfill(3) + str(int(duration)).zfill(4) + '\n', 'ascii')
     ser.write(moveMsg) 
 

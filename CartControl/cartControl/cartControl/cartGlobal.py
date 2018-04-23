@@ -4,22 +4,41 @@ import sys
 import numpy as np
 import cv2
 
+
+##################################################################
+# cartControl can run as slave of navManager or in standalone mode
+##################################################################
+standAloneMode = False   # False -> slave mode,  True -> standalone mode
+
+# configuration values for cart arduino infrared distance limits
+MIN_RANGE_SHORT=9
+MAX_RANGE_SHORT=15
+MIN_RANGE_LONG=16
+MAX_RANGE_LONG=30
+
 # odometry is only active when cart is moving
 _cartMoving = False
 _cartRotating = False
+_cartSpeed = 0
+
 _movementBlocked = False
 _timeMovementBlocked = None
 _moveDistance = 0
 _moveStartX = 0
 _moveStartY = 0
-_orientation = 0
+_cartOrientation = 0
+_targetOrientation = 0
 _moveStartTime = None
+_odometryRunning = False
 
-# Values in mm
-currPosX = 0
-currPosY = 0
+# Current cart position (center of cart) relative to map center, values in mm
+_cartPositionX = 0
+_cartPositionY = 0
 
-lastDistance = 0
+_lastDistance = 0
+_lastGoodDxPix = 0
+_lastGoodDyPix = 0
+
 arduinoStatus = 0
 
 # pixel-width in mm at 13 cm distance from ground
@@ -31,15 +50,15 @@ frameNr = 0
 
 navManager = None
 
-simulateLogger = True
-
 #def startlog():
 #    logging.basicConfig(filename="cartControl.log", level=logging.INFO, format='%(asctime)s - %(name)s - %(message)s', filemode="w")
 
 def log(msg):
-    if not simulateLogger:
+    if standAloneMode or navManager is None:
+        print("cart - " + msg)
+    else:
         navManager.root.recordLog("cart - " + msg)
-    print("cart - " + msg)
+
 
 def saveImg(img):
 
@@ -54,24 +73,36 @@ def saveImg(img):
 
 def setCartMoveDistance(distanceMm):
 
-    global _moveDistance, _moveStartX, _moveStartY, lastDistance, _moveStartTime
+    global _moveDistance, _moveStartX, _moveStartY, _lastDistance, _moveStartTime
 
     _moveDistance = distanceMm
-    _moveStartX = currPosX
-    _moveStartY = currPosY
-    lastDistance = 0
+    _moveStartX = _cartPositionX
+    _moveStartY = _cartPositionY
+    _lastDistance = 0
     _moveStartTime = time.time()
     
 
+def getMoveDistance():
+    return _moveDistance
+
+
+def currMoveDistance():
+
+    dx = np.abs(_cartPositionX - _moveStartX)
+    dy = np.abs(_cartPositionY - _moveStartY)
+
+    return np.hypot(dx, dy)
+
+
 def checkMoveDistanceReached():
 
-    dx = np.abs(currPosX - _moveStartX)
-    dy = np.abs(currPosY - _moveStartY)
+    log(f"moveDistance requested {_moveDistance}, moveDistance current {int(currMoveDistance())}, moveTime: {time.time() - _moveStartTime:.2f}")
 
-    dist = np.hypot(dx, dy)
-    #log(f"moveDistance requested {_moveDistance}, moveDistance current {int(dist)}, moveTime: {time.time() - _moveStartTime:.2f}")
+    return currMoveDistance() >= _moveDistance
 
-    return dist >= _moveDistance
+
+def getRemainingDistance():
+    return _moveDistance - currMoveDistance()
 
 
 def setCartMoving(new):
@@ -98,6 +129,15 @@ def setCartRotating(new):
     if isCartMoving():
         setCartMoving(False)
 
+
+def setTargetOrientation(relAngle): #CartRotating(new):
+
+    global _targetOrientation
+
+    _targetOrientation = (_cartOrientation + relAngle) % 360
+    log(f"setTargetOrientation -> currOrientation: {_cartOrientation}, relAngle: {relAngle}, targetOrientation: {_targetOrientation}")
+    setCartRotating(True)
+
     
 def isCartRotating():
 
@@ -116,33 +156,89 @@ def getMovementBlocked():
     return _movementBlocked, _timeMovementBlocked
 
 
+def setCartSpeed(speed):
+    
+    global _cartSpeed
+
+    _cartSpeed = speed
+
+
+def getCartSpeed():
+
+    return _cartSpeed
+
 
 def setOrientation(new):
 
-    global _orientation
+    global _cartOrientation
 
-    _orientation = round(new)
+    _cartOrientation = round(new)
 
     
 def getOrientation():
+    return _cartOrientation
 
-    return _orientation
+
+def setCartPosition(newX, newY):
+
+    global _cartPositionX, _cartPositionY
+
+    _cartPositionX = newX
+    _cartPositionY = newY
+
+
+def getCartPosition():
+    return _cartPositionX, _cartPositionY
+
+
+def getMoveStart():
+    return _moveStartX, _moveStartY    
 
 
 def updateCartPosition(dx, dy):
 
-    global currPosX, currPosY, lastDistance
+    global _lastDistance
 
-    currPosX += int(dx)
-    currPosY += int(dy)
+    log(f"updateCartPosition based on floor images, dx: {dx}, dy: {dy}")
 
-    dxMoved = np.abs(currPosX - _moveStartX)
-    dyMoved = np.abs(currPosY - _moveStartY)
+    posX, posY = getCartPosition()
+    posX += int(dx)
+    posY += int(dy)
+    setCartPosition(posX, posY)
+
+    startX, startY = getMoveStart()
+    dxMoved = np.abs(posX - startX)
+    dyMoved = np.abs(posY - startY)
     currDistance = np.hypot(dxMoved, dyMoved)
 
-    if currDistance > lastDistance+20:
-        log(f"dx: {dx:5.0f} dy: {dy:5.0f}  currPosX {currPosX:5.0f}  currPosY {currPosY:5.0f}, moveTime: {time.time() - _moveStartTime:.2f}")
-        lastDistance = currDistance
+    if currDistance > _lastDistance+20:
+        log(f"dx: {dx:5.0f} dy: {dy:5.0f}  _cartPositionX {_cartPositionX:5.0f}  _cartPositionY {_cartPositionY:5.0f}, moveTime: {time.time() - _moveStartTime:.2f}")
+        _lastDistance = currDistance
 
 
+def setLastGoodDxDyPix(dxPix, dyPix):
 
+    global _lastGoodDxPix, _lastGoodDyPix
+
+    _lastGoodDxPix = dxPix
+    _lastGoodDyPix = dyPix
+
+
+def getLastGoodDxDyPix():
+    return _lastGoodDxPix, _lastGoodDyPix
+
+
+def setOdometryRunning(newStatus):
+
+    global _odometryRunning
+
+    _odometryRunning = newStatus
+
+
+def isOdometryRunning():
+    return _odometryRunning
+
+
+def getRemainingRotation():
+    d = abs(_cartOrientation - _targetOrientation) % 360
+    return 360 - d if d > 180 else d

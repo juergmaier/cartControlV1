@@ -6,9 +6,9 @@ when cart is moving use ps3 cam pics to track movement
 using ORB
 '''
 
+import time, glob, os
 import numpy as np
 import cv2
-import time, glob, os
 
 import cartGlobal, arduino
 
@@ -18,10 +18,32 @@ orb = None
 bf = None
 matchFailures = 0
 
+
+def checkDecelerate():
+
+    if cartGlobal.isCartMoving():
+
+        cartSpeed = cartGlobal.getCartSpeed()
+        remainingDist = cartGlobal.getRemainingDistance()
+        #cartGlobal.log(f"check decelerate move, remainingDist: {int(remainingDist)}, currSpeed: {cartSpeed}")
+        if cartSpeed * remainingDist / 80 < cartSpeed:
+            cartSpeed -= 30
+            arduino.sendSpeedCommand(cartSpeed)    
+
+
+    if cartGlobal.isCartRotating():
+
+        #cartGlobal.log(f"check decelerate rotation, restRot: {restRot}, currSpeed: {cartSpeed}")
+        if cartSpeed * navGlobal.getRemainingRotation() / 5 < navGlobal.getCartSpeed():
+            cartSpeed -= 20
+            arduino.sendSpeedCommand(cartSpeed)    
+
+
 def doOdometry():
 
     global matchFailures
 
+    saveFloorImages = True
     minMatch = 8
 
     # first frame for tracking
@@ -29,6 +51,7 @@ def doOdometry():
     if not cartGlobal.isCartMoving():
 
         time.sleep(0.1)
+        cartGlobal.setLastGoodDxDy(0,0)
 
     else:
 
@@ -38,7 +61,8 @@ def doOdometry():
             ret, img1 = cap.read()
 
         if ret:
-            cartGlobal.saveImg(img1)
+            if saveFloorImages:
+                cartGlobal.saveImg(img1)
             img1bw = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
             kps1, des1 = orb.detectAndCompute(img1bw, None)
 
@@ -52,16 +76,15 @@ def doOdometry():
         ########################################################
         while cartGlobal.isCartMoving():
 
-            start = time.time()
-
-            #cartGlobal.log("cart is moving")
+            cartGlobal.log("cart is moving, check progress")
 
             # get 2 images
             for _ in range(2):
                 ret, img2 = cap.read()
 
             if ret:
-                cartGlobal.saveImg(img2)
+                if saveFloorImages:
+                    cartGlobal.saveImg(img2)
                 img2bw = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
                 kps2, des2 = orb.detectAndCompute(img2bw, None)
 
@@ -76,7 +99,7 @@ def doOdometry():
                 cartGlobal.log("knnMatch failure")
                 continue
 
-            if len(matches) == 0:
+            if not matches:
                 cartGlobal.log(f"No matches from bf.knnMach!")
                 continue
 
@@ -93,7 +116,10 @@ def doOdometry():
 
             if len(g_match) < minMatch:
 
-                cartGlobal.log(f"  Not enough matches have been found! - {len(g_match)}, {minMatch}, frame {cartGlobal.frameNr}")
+                cartGlobal.log(f"  Not enough matches have been found! - {len(g_match)}, {minMatch}, frame {cartGlobal.frameNr}, applying last dx/dy")
+                dxPix, dyPix = cartGlobal.getLastGoodDxDyPix()
+                cartGlobal.updateCartPosition(dxPix * cartGlobal.pix2mmX, dyPix * cartGlobal.pix2mmY)
+
 
             else:
 
@@ -101,7 +127,7 @@ def doOdometry():
                 src_pts = np.float32([ kps1[m.queryIdx].pt for m in g_match ]).reshape(-1,1,2)
                 dst_pts = np.float32([ kps2[m.trainIdx].pt for m in g_match ]).reshape(-1,1,2)
 
-                M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
+                _, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC,5.0)
                 matchesMask = mask.ravel().tolist()
 
 
@@ -117,7 +143,11 @@ def doOdometry():
                     ySum += src[i][0][1]-dst[i][0][1]
                 dxPix = xSum / numCompare
                 dyPix = ySum / numCompare
+                cartGlobal.log(f"dxPix {dxPix}, dyPix {dyPix}")
                 cartGlobal.updateCartPosition(dxPix * cartGlobal.pix2mmX, dyPix * cartGlobal.pix2mmY)
+                cartGlobal.setLastGoodDxDyPix(dxPix, dyPix)
+
+                checkDecelerate()
 
                 if not cartGlobal.isCartRotating():
 
@@ -125,10 +155,10 @@ def doOdometry():
                     if cartGlobal.checkMoveDistanceReached():
 
                         arduino.sendStopCommand()
-                        cartGlobal.log(f"move distance reached: distance {cartGlobal._moveDistance}, \
-                        start x/y: {cartGlobal._moveStartX}/{cartGlobal._moveStartY}, \
-                        curr x/y: {cartGlobal.currPosX}/{cartGlobal.currPosY}, \
-                        move time: {time.time() - cartGlobal._moveStartTime:.2f}")
+                        cartGlobal.log(f"move distance reached: distance {cartGlobal._moveDistance}," + 
+                                       f"start x/y: {cartGlobal._moveStartX}/{cartGlobal._moveStartY}," + 
+                                       f"curr x/y: {cartGlobal._cartPositionX}/{cartGlobal._cartPositionY}," + 
+                                       f"move time: {time.time() - cartGlobal._moveStartTime:.2f}")
 
             # use new image as last one
             img1bw = img2bw
@@ -151,13 +181,13 @@ def trackCartMovements():
 
         cap = cv2.VideoCapture(1)
         cap.set(cv2.CAP_PROP_FPS, 100)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320); 
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240); 
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
         cartGlobal.log(f"cam params fps: {cap.get(cv2.CAP_PROP_FPS)}, w: {cap.get(cv2.CAP_PROP_FRAME_WIDTH)}, h: {cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}")
 
         time.sleep(0.5)         # allow cam to adjust to light
 
-        for i in range(2):      # first frame is black
+        for _ in range(2):      # first frame is black
             ret, img = cap.read()
 
         if ret:

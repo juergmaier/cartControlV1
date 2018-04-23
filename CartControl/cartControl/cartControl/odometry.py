@@ -76,7 +76,7 @@ def doOdometry():
         ########################################################
         while cartGlobal.isCartMoving():
 
-            cartGlobal.log("cart is moving, check progress")
+            #cartGlobal.log("cart is moving, check progress")
 
             # get 2 images
             for _ in range(2):
@@ -138,27 +138,29 @@ def doOdometry():
                 #try:
                 xSum, ySum = 0, 0
                 numCompare = min(len(src), 10)
+
                 for i in range(numCompare):
                     xSum += src[i][0][0]-dst[i][0][0]
                     ySum += src[i][0][1]-dst[i][0][1]
-                dxPix = xSum / numCompare
-                dyPix = ySum / numCompare
-                cartGlobal.log(f"dxPix {dxPix}, dyPix {dyPix}")
-                cartGlobal.updateCartPosition(dxPix * cartGlobal.pix2mmX, dyPix * cartGlobal.pix2mmY)
-                cartGlobal.setLastGoodDxDyPix(dxPix, dyPix)
+                    if numCompare:
+                        dxPix = xSum / numCompare
+                        dyPix = ySum / numCompare
+                        cartGlobal.setLastGoodDxDyPix(dxPix, dyPix)
+                        #cartGlobal.log(f"dxPix {dxPix}, dyPix {dyPix}")
 
-                checkDecelerate()
+            cartGlobal.updateCartPosition(dxPix * cartGlobal.pix2mmX, dyPix * cartGlobal.pix2mmY)
 
-                if not cartGlobal.isCartRotating():
+            checkDecelerate()
 
-                    # check for requested distance travelled
-                    if cartGlobal.checkMoveDistanceReached():
+            if not cartGlobal.isCartRotating():
 
-                        arduino.sendStopCommand()
-                        cartGlobal.log(f"move distance reached: distance {cartGlobal._moveDistance}," + 
-                                       f"start x/y: {cartGlobal._moveStartX}/{cartGlobal._moveStartY}," + 
-                                       f"curr x/y: {cartGlobal._cartPositionX}/{cartGlobal._cartPositionY}," + 
-                                       f"move time: {time.time() - cartGlobal._moveStartTime:.2f}")
+                # check for requested distance travelled
+                if cartGlobal.checkMoveDistanceReached():
+
+                    arduino.sendStopCommand()
+                    cartGlobal.log(f"move distance reached: target distance: {cartGlobal._moveDistance}," + 
+                                    f" travelled distance: {cartGlobal.currMoveDistance()}," + 
+                                    f" move time: {time.time() - cartGlobal._moveStartTime:.2f}")
 
             # use new image as last one
             img1bw = img2bw
@@ -192,7 +194,10 @@ def trackCartMovements():
 
         if ret:
             cartGlobal.log("cam connected")
+            cv2.imshow("initial frame", img)
+            cv2.waitKey(500)
             cartGlobal.saveImg(img)
+            cv2.destroyAllWindows()
 
             camConnected = True
 

@@ -203,7 +203,7 @@ def sendSpeedCommand(speed):
 
     # command 6
     msg = bytes(str(6000+speed)+'\n', 'ascii')
-    cartGlobal.log("Send speed "+str(msg))
+    #cartGlobal.log("Send speed "+str(msg))
     ser.write(msg)
     cartGlobal.setCartSpeed(speed)
 

@@ -91,12 +91,12 @@ def currMoveDistance():
     dx = np.abs(_cartPositionX - _moveStartX)
     dy = np.abs(_cartPositionY - _moveStartY)
 
-    return np.hypot(dx, dy)
+    return int(np.hypot(dx, dy))
 
 
 def checkMoveDistanceReached():
 
-    log(f"moveDistance requested {_moveDistance}, moveDistance current {int(currMoveDistance())}, moveTime: {time.time() - _moveStartTime:.2f}")
+    #log(f"moveDistance requested {_moveDistance}, moveDistance current {int(currMoveDistance())}, moveTime: {time.time() - _moveStartTime:.2f}")
 
     return currMoveDistance() >= _moveDistance
 
@@ -199,7 +199,7 @@ def updateCartPosition(dx, dy):
 
     global _lastDistance
 
-    log(f"updateCartPosition based on floor images, dx: {dx}, dy: {dy}")
+    #log(f"updateCartPosition based on floor images, dx: {dx}, dy: {dy}")
 
     posX, posY = getCartPosition()
     posX += int(dx)
@@ -212,7 +212,7 @@ def updateCartPosition(dx, dy):
     currDistance = np.hypot(dxMoved, dyMoved)
 
     if currDistance > _lastDistance+20:
-        log(f"dx: {dx:5.0f} dy: {dy:5.0f}  _cartPositionX {_cartPositionX:5.0f}  _cartPositionY {_cartPositionY:5.0f}, moveTime: {time.time() - _moveStartTime:.2f}")
+        #log(f"dx: {dx:5.0f} dy: {dy:5.0f}  _cartPositionX {_cartPositionX:5.0f}  _cartPositionY {_cartPositionY:5.0f}, moveTime: {time.time() - _moveStartTime:.2f}")
         _lastDistance = currDistance
 
 

@@ -40,16 +40,16 @@ def readMessages():
     global ser
 
     while ser is None:
-        time.sleep(0.02)
+        time.sleep(0.1)
 
     while ser.is_open:
 
-        while ser.inWaiting() > 0:
+        if ser.inWaiting() > 0:
             recvB = ser.readline()
             try:
                 recv = recvB.decode()
             except:
-                cartGlobal.log("problem with decoding cart msg")
+                cartGlobal.log(f"problem with decoding cart msg '{recvB}'")
             msgID = recvB[0:3].decode()
 
             #cartGlobal.log("in read message: ", msgID)
@@ -63,7 +63,7 @@ def readMessages():
                 #!A1,<sensorID>,<ANZ_MESSUNGEN_PRO_SCAN>,[ANZ_MESSUNGEN_PRO_SCAN<value>,]
                 messageItems = [int(e) if e.isdigit() else e for e in recv.split(',')]
                 cartControl.updateDistances(messageItems[1:])
-                gui.controller.showDistances(messageItems[1])
+                #gui.controller.showDistances(messageItems[1])      test, could be responsible for delays in message read?
                 
 
             elif msgID == "!A2":    #"obstacle:":
@@ -80,7 +80,7 @@ def readMessages():
                     distance = distanceShort
                 else:
                     distance = distanceLong
-                gui.controller.updateDistanceSensorObstacle(distance)
+                #gui.controller.updateDistanceSensorObstacle(distance)
 
 
             elif msgID == "!A3":    #"abyss:":
@@ -99,11 +99,13 @@ def readMessages():
                     distance = distanceLong
 
                 cartGlobal.setMovementBlocked(True)
-                gui.controller.updateDistanceSensorAbyss(distance)
+                #gui.controller.updateDistanceSensorAbyss(distance)
 
 
             elif msgID == "!A5":    #"cart stopped":
                 #!A3
+                cartGlobal.setOrientation(round(float(recv.split(",")[1])))      # delays with A9 occurred
+
                 cartGlobal.setMovementBlocked(False)
                 cartGlobal.setCartRotating(False)
                 cartGlobal.setCartMoving(False)
@@ -142,7 +144,7 @@ def readMessages():
                 except:
                     cartGlobal.log(f"Unexpected error on reading messages: {sys.exc_info()[0]}")
 
-            time.sleep(0.001)    # give other threads a chance
+        time.sleep(0.01)    # give other threads a chance
 
 
 
@@ -155,18 +157,26 @@ def sendConfigValues():
 
 
 def sendMoveCommand(direction, speed, distanceMm):
-
+    '''
+    move command to cart
+    the arduino does not have an odometer and movement it limited with a max duration (ms)
+    when the floor cam tracking detects requested distance travelled it sends a
+    stop cart to the arduino
+    the arduino also monitors movement / rotation progress and may stop the cart on its own
+    '''
     ## conmmand 1
-    cartGlobal.setCartMoveDistance(distanceMm)
+    distanceMmLimited = min(distanceMm, 3000)       # limit distance for single command
+    cartGlobal.setCartMoveDistance(distanceMmLimited)
     cartGlobal.setCartSpeed(speed)
-    duration = ((distanceMm / speed) * 2500) + 1000
-    moveMsg = bytes('1' + str(direction) + str(speed).zfill(3) + str(int(duration)).zfill(4) + '\n', 'ascii')
+    duration = ((distanceMm / speed) * 1500) + 1000
+    durationLimited = min(duration, 5000)      # do not move more than 5 seconds
+    moveMsg = bytes('1' + str(direction) + str(speed).zfill(3) + str(int(durationLimited)).zfill(4) + '\n', 'ascii')
     ser.write(moveMsg) 
 
     cartGlobal.setMovementBlocked(False)
     cartGlobal.setCartMoving(True)
 
-    cartGlobal.log(f"Send move {moveMsg}, speed: {int(speed)}, distance: {distanceMm}, duration: {duration}")
+    cartGlobal.log(f"Send move {moveMsg}, speed: {int(speed)}, distance: {distanceMmLimited}, duration: {durationLimited}")
 
 
 def sendRotateCommand(relAngle):

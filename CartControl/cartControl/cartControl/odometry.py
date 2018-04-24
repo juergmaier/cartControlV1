@@ -34,7 +34,7 @@ def checkDecelerate():
     if cartGlobal.isCartRotating():
 
         #cartGlobal.log(f"check decelerate rotation, restRot: {restRot}, currSpeed: {cartSpeed}")
-        if cartSpeed * navGlobal.getRemainingRotation() / 5 < navGlobal.getCartSpeed():
+        if cartSpeed * cartGlobal.getRemainingRotation() / 5 < cartGlobal.getCartSpeed():
             cartSpeed -= 20
             arduino.sendSpeedCommand(cartSpeed)    
 

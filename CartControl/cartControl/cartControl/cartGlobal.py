@@ -140,7 +140,6 @@ def setTargetOrientation(relAngle): #CartRotating(new):
 
     
 def isCartRotating():
-
     return _cartRotating
 
 

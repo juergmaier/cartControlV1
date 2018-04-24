@@ -89,7 +89,9 @@ def cartInit():
 
 
 def updateDistances(Values):
+
     global distanceList
+
     sensorID = Values[0]
     numValues = Values[1]
 

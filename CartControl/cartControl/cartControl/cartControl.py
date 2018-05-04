@@ -21,34 +21,34 @@ NUM_DISTANCE_SENSORS = 10
 NUM_MEASUREMENTS_PER_SCAN = 11
 distanceSensors = []
 # VL nah
-distanceSensors.append({'sensorID': 0, 'direction':'forward', 'position':'left', 'range':'short', 
+distanceSensors.append({'sensorID': 0, 'direction':'forward', 'position':'left', 'range':'short', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(0,0), 'installed': True, 'servoIndex':0, 'color':'red', 'rotation':-180})
 # VL fern
-distanceSensors.append({'sensorID': 1, 'direction':'forward', 'position':'left', 'range':'long', 
+distanceSensors.append({'sensorID': 1, 'direction':'forward', 'position':'left', 'range':'long', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(0,1), 'installed': True, 'servoIndex':0, 'color':'blue', 'rotation':-180})
 # VR nah
-distanceSensors.append({'sensorID': 2, 'direction':'forward', 'position':'right', 'range':'short', 
+distanceSensors.append({'sensorID': 2, 'direction':'forward', 'position':'right', 'range':'short', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(1,0), 'installed': True, 'servoIndex':1, 'color':'red', 'rotation':-180})
 # VR fern
-distanceSensors.append({'sensorID': 3, 'direction':'forward', 'position':'right', 'range':'long', 
+distanceSensors.append({'sensorID': 3, 'direction':'forward', 'position':'right', 'range':'long', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(1,1), 'installed': True, 'servoIndex':1, 'color':'blue', 'rotation':-180})
 # LM nah
-distanceSensors.append({'sensorID': 4, 'direction':'left', 'position':'middle', 'range':'short', 
+distanceSensors.append({'sensorID': 4, 'direction':'left', 'position':'middle', 'range':'short', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(2,0), 'installed': True, 'servoIndex':2, 'color':'red', 'rotation':90})
 # RM nah
-distanceSensors.append({'sensorID': 5, 'direction':'right', 'position':'middle', 'range':'short', 
+distanceSensors.append({'sensorID': 5, 'direction':'right', 'position':'middle', 'range':'short', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(2,1), 'installed': True, 'servoIndex':2, 'color':'red', 'rotation':-90})
 # HL nah
-distanceSensors.append({'sensorID': 6, 'direction':'backward', 'position':'left', 'range':'short', 
+distanceSensors.append({'sensorID': 6, 'direction':'backward', 'position':'left', 'range':'short', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(3,0), 'installed': True, 'servoIndex':3, 'color':'red', 'rotation':0})
 # HL fern
-distanceSensors.append({'sensorID': 7, 'direction':'backward', 'position':'left', 'range':'long', 
+distanceSensors.append({'sensorID': 7, 'direction':'backward', 'position':'left', 'range':'long', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(3,1), 'installed': True, 'servoIndex':3, 'color':'blue', 'rotation':0})
 # HR nah
-distanceSensors.append({'sensorID': 8, 'direction':'backward', 'position':'right', 'range':'short', 
+distanceSensors.append({'sensorID': 8, 'direction':'backward', 'position':'right', 'range':'short', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(3,0), 'installed': True, 'servoIndex':4, 'color':'red', 'rotation':0})
 # HR fern
-distanceSensors.append({'sensorID': 9, 'direction':'backward', 'position':'right', 'range':'long', 
+distanceSensors.append({'sensorID': 9, 'direction':'backward', 'position':'right', 'range':'long', 'newValuesShown':False, 
     'timestamp':time.time(), 'valueIndex':(3,1), 'installed': True, 'servoIndex':4, 'color':'blue', 'rotation':0})
 
 distanceList = np.zeros((NUM_DISTANCE_SENSORS, NUM_MEASUREMENTS_PER_SCAN))
@@ -90,7 +90,7 @@ def cartInit():
 
 def updateDistances(Values):
 
-    global distanceList
+    global distanceList, distanceSensors
 
     sensorID = Values[0]
     numValues = Values[1]
@@ -103,14 +103,15 @@ def updateDistances(Values):
         except ValueError:
             distanceList[sensorID][i] = 0.0
 
-    # update timestamp of last measurement
-    # distanceSensors[sensorID].update({'timestamp': time.time})
-    
-    for key in distanceSensors[sensorID].keys():
-        if key == 'timestamp':
-            distanceSensors[sensorID][key] = time.time()
+    distanceSensors[sensorID]['timestamp'] = time.time()
+    distanceSensors[sensorID]['newValuesShown'] = False
 
 
+def setSensorDataShown(sensorID, new):
+
+    global distanceSensors
+
+    distanceSensors[sensorID]['newValuesShown'] = new
 
 
 class cartCommands(rpyc.Service):

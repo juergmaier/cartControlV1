@@ -12,14 +12,15 @@ standAloneMode = False   # False -> slave mode,  True -> standalone mode
 
 # configuration values for cart arduino infrared distance limits
 MIN_RANGE_SHORT=9
-MAX_RANGE_SHORT=15
+MAX_RANGE_SHORT=16
 MIN_RANGE_LONG=16
 MAX_RANGE_LONG=30
 
 # odometry is only active when cart is moving
 _cartMoving = False
 _cartRotating = False
-_cartSpeed = 0
+_requestedCartSpeed = 0
+_cartSpeedFromOdometry = 0
 
 _movementBlocked = False
 _timeMovementBlocked = None
@@ -36,39 +37,36 @@ _cartPositionX = 0
 _cartPositionY = 0
 
 _lastDistance = 0
-_lastGoodDxPix = 0
-_lastGoodDyPix = 0
+_lastDxPixPerSec = 0
+_lastDyPixPerSec = 0
+#_lastTrackedMoveDuration = 0
+#_lastGoodMoveTimestamp = time.time()
+_lastDistEvalTimestamp = time.time()
 
 arduinoStatus = 0
 
 # pixel-width in mm at 13 cm distance from ground
-pix2mmX = 0.7
-# pixel-height at 13 cm distance from ground
-pix2mmY = 0.7
-
-frameNr = 0
+PIX_PER_MM = 0.47
 
 navManager = None
 
+taskStarted = time.time()
 #def startlog():
 #    logging.basicConfig(filename="cartControl.log", level=logging.INFO, format='%(asctime)s - %(name)s - %(message)s', filemode="w")
 
 def log(msg):
     if standAloneMode or navManager is None:
-        print("cart - " + msg)
+        print(f"time: {time.time()-taskStarted:.3f} "  + msg)
     else:
         navManager.root.recordLog("cart - " + msg)
 
 
-def saveImg(img):
-
-    global frameNr
+def saveImg(img, frameNr):
 
     try:
         cv2.imwrite(f"C:/cartControl/floorImages/floor_{frameNr}.jpg", img)
     except:
         log(f"cartGlobal, saveImg exception {sys.exc_info()[0]}")
-    frameNr += 1
 
 
 def setCartMoveDistance(distanceMm):
@@ -107,10 +105,11 @@ def getRemainingDistance():
 
 def setCartMoving(new):
 
-    global _cartMoving
+    global _cartMoving #, _lastTrackedMoveDuration
 
-    log(f"setCartMoving {new}")
+    #log(f"setCartMoving {new}")
     _cartMoving = new
+
     if isCartRotating():
         setCartRotating(False)
 
@@ -124,7 +123,7 @@ def setCartRotating(new):
 
     global _cartRotating
 
-    log(f"setCartRotating {new}")
+    #log(f"setCartRotating {new}")
     _cartRotating = new
     if isCartMoving():
         setCartMoving(False)
@@ -155,16 +154,27 @@ def getMovementBlocked():
     return _movementBlocked, _timeMovementBlocked
 
 
-def setCartSpeed(speed):
+def setRequestedCartSpeed(speed):
     
-    global _cartSpeed
+    global _requestedCartSpeed
 
-    _cartSpeed = speed
+    _requestedCartSpeed = speed
 
 
-def getCartSpeed():
+def getRequestedCartSpeed():
 
-    return _cartSpeed
+    return _requestedCartSpeed
+
+
+def setCartSpeedFromOdometry(speed):
+    
+    global _cartSpeedFromOdometry
+
+    _cartSpeedFromOdometry = speed
+
+
+def getCartSpeedFromOdometry():
+    return _cartSpeedFromOdometry
 
 
 def setOrientation(new):
@@ -194,15 +204,15 @@ def getMoveStart():
     return _moveStartX, _moveStartY    
 
 
-def updateCartPosition(dx, dy):
+def updateCartPositionInMm(dx, dy):     # here we use mm not pixels!
 
     global _lastDistance
 
     #log(f"updateCartPosition based on floor images, dx: {dx}, dy: {dy}")
 
     posX, posY = getCartPosition()
-    posX += int(dx)
-    posY += int(dy)
+    posX += int(dx * PIX_PER_MM)
+    posY += int(dy * PIX_PER_MM)
     setCartPosition(posX, posY)
 
     startX, startY = getMoveStart()
@@ -210,21 +220,10 @@ def updateCartPosition(dx, dy):
     dyMoved = np.abs(posY - startY)
     currDistance = np.hypot(dxMoved, dyMoved)
 
-    if currDistance > _lastDistance+20:
-        #log(f"dx: {dx:5.0f} dy: {dy:5.0f}  _cartPositionX {_cartPositionX:5.0f}  _cartPositionY {_cartPositionY:5.0f}, moveTime: {time.time() - _moveStartTime:.2f}")
-        _lastDistance = currDistance
+#    if currDistance > _lastDistance+20:
+    log(f"cartMovement[mm] total distance: {currDistance:.0f}, total time: {time.time() - _moveStartTime:.2f}")
+ #       _lastDistance = currDistance
 
-
-def setLastGoodDxDyPix(dxPix, dyPix):
-
-    global _lastGoodDxPix, _lastGoodDyPix
-
-    _lastGoodDxPix = dxPix
-    _lastGoodDyPix = dyPix
-
-
-def getLastGoodDxDyPix():
-    return _lastGoodDxPix, _lastGoodDyPix
 
 
 def setOdometryRunning(newStatus):
@@ -241,3 +240,10 @@ def isOdometryRunning():
 def getRemainingRotation():
     d = abs(_cartOrientation - _targetOrientation) % 360
     return 360 - d if d > 180 else d
+
+
+def setDistEvalTimestamp():
+
+    global _lastDistEvalTimestamp
+
+    _lastDistEvalTimestamp = time.time()

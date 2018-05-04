@@ -23,6 +23,7 @@ def initSerial(comPort):
             time.sleep(0.1)
             ser.setDTR(True)
             ser.baudrate = 115200
+            ser.writeTimeout = 0
             cartGlobal.log("Serial comm to arduino established")
             return
 
@@ -45,11 +46,14 @@ def readMessages():
     while ser.is_open:
 
         if ser.inWaiting() > 0:
-            recvB = ser.readline()
+            #cartGlobal.log(f"inWaiting > 0")
+            recvB = ser.readline(120)
             try:
                 recv = recvB.decode()
             except:
                 cartGlobal.log(f"problem with decoding cart msg '{recvB}'")
+
+            #cartGlobal.log(f"line read {recv}")
             msgID = recvB[0:3].decode()
 
             #cartGlobal.log("in read message: ", msgID)
@@ -80,7 +84,7 @@ def readMessages():
                     distance = distanceShort
                 else:
                     distance = distanceLong
-                #gui.controller.updateDistanceSensorObstacle(distance)
+                gui.controller.updateDistanceSensorObstacle(distance)
 
 
             elif msgID == "!A3":    #"abyss:":
@@ -99,7 +103,7 @@ def readMessages():
                     distance = distanceLong
 
                 cartGlobal.setMovementBlocked(True)
-                #gui.controller.updateDistanceSensorAbyss(distance)
+                gui.controller.updateDistanceSensorAbyss(distance)
 
 
             elif msgID == "!A5":    #"cart stopped":
@@ -143,8 +147,9 @@ def readMessages():
                     cartGlobal.log("<-A " + recv[:-2])
                 except:
                     cartGlobal.log(f"Unexpected error on reading messages: {sys.exc_info()[0]}")
-
-        time.sleep(0.01)    # give other threads a chance
+            
+            #cartGlobal.log("msg processed")
+        time.sleep(0.001)    # give other threads a chance
 
 
 
@@ -164,12 +169,12 @@ def sendMoveCommand(direction, speed, distanceMm):
     stop cart to the arduino
     the arduino also monitors movement / rotation progress and may stop the cart on its own
     '''
-    ## conmmand 1
-    distanceMmLimited = min(distanceMm, 3000)       # limit distance for single command
+    # conmmand 1
+    distanceMmLimited = min(distanceMm, 2500)       # limit distance for single command
     cartGlobal.setCartMoveDistance(distanceMmLimited)
-    cartGlobal.setCartSpeed(speed)
-    duration = ((distanceMm / speed) * 1500) + 1000
-    durationLimited = min(duration, 5000)      # do not move more than 5 seconds
+    cartGlobal.setRequestedCartSpeed(speed)
+    duration = ((distanceMm / speed) * 2200) + 1000
+    durationLimited = min(duration, 8000)      # do not move more than 8 seconds
     moveMsg = bytes('1' + str(direction) + str(speed).zfill(3) + str(int(durationLimited)).zfill(4) + '\n', 'ascii')
     ser.write(moveMsg) 
 
@@ -185,7 +190,7 @@ def sendRotateCommand(relAngle):
 
     cartGlobal.setMovementBlocked(False)
     cartGlobal.setTargetOrientation(relAngle)
-    cartGlobal.setCartSpeed(ROTATION_SPEED)        # Arduino uses fixed rotation speed
+    cartGlobal.setRequestedCartSpeed(ROTATION_SPEED)        # Arduino uses fixed rotation speed
 
     # command 2
     if relAngle > 0:   # rotate counterclock
@@ -215,7 +220,7 @@ def sendSpeedCommand(speed):
     msg = bytes(str(6000+speed)+'\n', 'ascii')
     #cartGlobal.log("Send speed "+str(msg))
     ser.write(msg)
-    cartGlobal.setCartSpeed(speed)
+    cartGlobal.setRequestedCartSpeed(speed)
 
 
 def getCartOrientation():

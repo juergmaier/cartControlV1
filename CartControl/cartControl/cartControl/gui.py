@@ -207,7 +207,7 @@ class manualControl:
 
         self.sbSpeed=tk.Spinbox(frame, from_=0, to=250, width=3)
         self.sbSpeed.grid(row = 62, column = 1, padx=10, sticky=tk.W)
-        self.sbSpeed.insert(0,20)
+        self.sbSpeed.insert(0,18)
         
         self.choices=["stop","forward","for_diag_right","for_diag_left","left","right","backward","back_diag_right","back_diag_left"]
         defaultDirection="forward"
@@ -274,19 +274,25 @@ class manualControl:
             self.startArduino()
         
 
-    def showDistances(self, sensorID=None):
+    def showNewDistances(self):
+
+        #cartGlobal.log("showNewDistancies")
 
         cartControl.obstacleInfo=[]
 
-        if sensorID is None: 
-            r=cartControl.NUM_DISTANCE_SENSORS - 1
-        else:
-            r=sensorID
+        r = cartControl.NUM_DISTANCE_SENSORS
 
-        for i in range(r, r + 1):
+        for i in range(r):
             s=cartControl.distanceSensors[i]
             d=cartControl.distanceList[i]
             sensor=sensors[i]
+
+            # check for new data
+            if s['newValuesShown']:
+                continue
+
+            cartControl.setSensorDataShown(i, True)
+            #cartGlobal.log(f"show new sensor data {i}")
 
             # clear area
             col="white"
@@ -346,16 +352,14 @@ class manualControl:
                 except:
                     cartGlobal.log("ERROR: sensor.x,.y: " + str(sensor.x) + ", " + str(sensor.y))
 
+
     def selectedDirection(self, value):
         self.direction=self.choices.index(value)
-        #cartGlobal.logln("selected direction: " + value + " index: " +
-        #self.direction)
 
-    #def selectedServo(self, value):
-    #    self.servoID = self.servoChoices.index(value)
 
     def selectedSensorTest(self, value):
         self.sensorTest=self.sensorTestChoices.index(value)
+
 
     def startArduino(self):
 
@@ -369,6 +373,8 @@ class manualControl:
 
 
     def checkStatus(self):
+
+        #cartGlobal.log("checkStatus")
     
         if cartGlobal.arduinoStatus == 1:
             self.lblInfo.configure(text = "cart ready", bg="lawn green", fg="black")
@@ -376,20 +382,22 @@ class manualControl:
             self.btnMove.configure(state="normal")
             self.btnNav.configure(state="normal")
             self.w.update_idletasks()
-            self.w.after(10, self.heartBeat)
-            arduino.getCartOrientation()
+            self.w.after(100, self.heartBeat)
+            #arduino.getCartOrientation()
         else:
             self.w.after(400, self.checkStatus)
       
 
     def navigateTo(self):
         start=time.time()
-        PathFinder.analyze((int(self.sbX.get()),int(self.sbY.get())))
+        #PathFinder.analyze((int(self.sbX.get()),int(self.sbY.get())))
         cartGlobal.log(f"analyzed in: {time.time() - start} seconds")
         self.w.update_idletasks()
     
 
     def heartBeat(self):
+
+        #cartGlobal.log("heartBeat")
 
         # toggle heartBeat message color
         if self.lblHeartBeat.cget("fg") == "red":
@@ -398,12 +406,14 @@ class manualControl:
             self.lblHeartBeat.configure(fg = "red")
 
         arduino.sendHeartbeat()
-        arduino.getCartOrientation()
+        # arduino.getCartOrientation()
         self.lblRotationCurrentValue.configure(text=str(cartGlobal.getOrientation()))
+
+        # check for updating new sensor data in gui
+        self.showNewDistances()
+
         self.w.update_idletasks()
         self.w.after(500, self.heartBeat)   # heart beat loop
-        
-#        self.showDistances()
 
 
     def stopCart(self):
@@ -413,6 +423,7 @@ class manualControl:
         self.lblRotationCurrentValue.configure(text=str(cartGlobal.getOrientation()))
         self.lblCommandValue.configure(text="Stop")
         self.w.update_idletasks()
+
     
     def moveCart(self):
 

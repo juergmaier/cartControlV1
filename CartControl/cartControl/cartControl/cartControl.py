@@ -1,9 +1,13 @@
 
+import os
+import sys
 import time
 import threading
 import numpy as np
 import rpyc
 from rpyc.utils.server import ThreadedServer
+import win32gui     # part of pywin32
+
 import gui
 import arduino
 
@@ -54,6 +58,8 @@ distanceSensors.append({'sensorID': 9, 'direction':'backward', 'position':'right
 distanceList = np.zeros((NUM_DISTANCE_SENSORS, NUM_MEASUREMENTS_PER_SCAN))
 
 
+
+
 def cartInit(): 
 
     cartGlobal.setMovementBlocked(False)
@@ -68,13 +74,15 @@ def cartInit():
     print("start msg reader cart-arduino")
     msgThread.start()
 
+    # test using speed for distance evaluation as camOdometry did not work reliably
+    '''
     if not cartGlobal.isOdometryRunning():
         # start odometry thread    
         camThread = threading.Thread(target=odometry.trackCartMovements, args={})
         print("start cart tracker")
         camThread.start()
         cartGlobal.setOdometryRunning(True)
-
+    '''
     print("gui, message and odometry threads startet")
 
     # wait for cart startup finished
@@ -116,6 +124,17 @@ def setSensorDataShown(sensorID, new):
 
 class cartCommands(rpyc.Service):
 
+    def on_disconnect(self):
+        print("connection to navManager lost")
+
+        print("EOF Error in cartControl, try to restart the task")
+
+        #arduino.ser.close()
+        cartGlobal.navManager.close()
+        #task = sys.executable
+        #os.execl(task, task, * sys.argv)
+
+
     def exposed_startListening(self, logIP, logPort):
         '''
         a first call from navManager
@@ -134,10 +153,12 @@ class cartCommands(rpyc.Service):
             cartGlobal.navManager.root.processStatus("cart",True)
 
   
-    def exposed_rotateRelative(self, angle):
-        cartGlobal.log(f"exposed_rotateRelative, angle: {angle}")
-        arduino.sendRotateCommand(int(angle))
-        gui.controller.updateTargetRotation(cartGlobal.getOrientation() + int(angle))
+    def exposed_rotateRelative(self, angle, speed):
+        if abs(angle) > 0:
+            cartGlobal.log(f"exposed_rotateRelative, angle: {angle:.1f}")
+            arduino.sendRotateCommand(int(angle), int(speed))
+            gui.controller.updateTargetRotation(cartGlobal.getOrientation() + int(angle))
+
 
         
     def exposed_move(self, direction, speed, distance=10):
@@ -149,7 +170,7 @@ class cartCommands(rpyc.Service):
         gui.controller.stopCart()
 
     def exposed_requestCartOrientation(self):
-        return str(cartGlobal.getOrientation())
+        return cartGlobal.getOrientation()
 
     def exposed_heartBeat(self):
         global lastMessage
@@ -160,23 +181,38 @@ class cartCommands(rpyc.Service):
         cartGlobal.log(currTime - lastMessage)
         if currTime - lastMessage > TIMEOUT:
             if cartGlobal.isCartMoving:
-                arduino.sendStopCommand()
+                arduino.sendStopCommand("missing heartbeat from navManager")
         else:
             arduino.sendHeartbeat()
             cartGlobal.log("arduino Heartbeat sent")
 
         lastMessage = int(round(time.time() * 1000))
 
+
     def exposed_getObstacleInfo(self):
         return obstacleInfo
+
 
     def exposed_getCartInfo(self):
         posX, posY = cartGlobal.getCartPosition()
         return cartGlobal.getOrientation(), posX, posY, cartGlobal.isCartMoving(), cartGlobal.isCartRotating()
 
 
+    def exposed_getBatteryStatus(self):
+        return cartGlobal.getBatteryStatus()
+
+
+    def exposed_isCartMoving(self):
+        return cartGlobal.isCartMoving()
+
+
 
 if __name__ == '__main__':
+
+    windowName = "marvin//cartControl"
+    os.system("title " + windowName)
+    hwnd = win32gui.FindWindow(None, windowName)
+    win32gui.MoveWindow(hwnd, 280,0,1200,400,True)
 
     print ("startup cart")
     cartInit()
@@ -186,4 +222,7 @@ if __name__ == '__main__':
         cartGlobal.log("wait for messages from navManager ...")
         t = ThreadedServer(cartCommands, port=CART_PORT)
         t.start()
+
+
+
 

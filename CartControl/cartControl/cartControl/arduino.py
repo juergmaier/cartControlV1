@@ -44,110 +44,154 @@ def readMessages():
         time.sleep(0.1)
 
     while ser.is_open:
+        try:
+            if ser.inWaiting() > 0:
+                #cartGlobal.log(f"inWaiting > 0")
+                recvB = ser.readline(120)
+                try:
+                    recv = recvB.decode()
+                except:
+                    cartGlobal.log(f"problem with decoding cart msg '{recvB}'")
 
-        if ser.inWaiting() > 0:
-            #cartGlobal.log(f"inWaiting > 0")
-            recvB = ser.readline(120)
-            try:
-                recv = recvB.decode()
-            except:
-                cartGlobal.log(f"problem with decoding cart msg '{recvB}'")
+                #cartGlobal.log(f"line read {recv}")
+                msgID = recvB[0:3].decode()
 
-            #cartGlobal.log(f"line read {recv}")
-            msgID = recvB[0:3].decode()
+                #cartGlobal.log("in read message: ", msgID)
 
-            #cartGlobal.log("in read message: ", msgID)
+                if msgID == "!A0":     #"cart ready"
+                    cartGlobal.arduinoStatus = 1
+                    cartGlobal.log("cart ready")
+                    sendConfigValues()
 
-            if msgID == "!A0":     #"cart ready"
-                cartGlobal.arduinoStatus = 1
-                cartGlobal.log("cart ready")
-                sendConfigValues()
-
-            elif msgID == "!A1":    #"distance,":
-                #!A1,<sensorID>,<ANZ_MESSUNGEN_PRO_SCAN>,[ANZ_MESSUNGEN_PRO_SCAN<value>,]
-                messageItems = [int(e) if e.isdigit() else e for e in recv.split(',')]
-                cartControl.updateDistances(messageItems[1:])
-                #gui.controller.showDistances(messageItems[1])      test, could be responsible for delays in message read?
+                elif msgID == "!A1":    #"distance,":
+                    #!A1,<sensorID>,<ANZ_MESSUNGEN_PRO_SCAN>,[ANZ_MESSUNGEN_PRO_SCAN<value>,]
+                    messageItems = [int(e) if e.isdigit() else e for e in recv.split(',')]
+                    cartControl.updateDistances(messageItems[1:])
+                    #gui.controller.showDistances(messageItems[1])      test, could be responsible for delays in message read?
                 
 
-            elif msgID == "!A2":    #"obstacle:":
-                #!A2,<distance>
-                try:
-                    distanceShort = float(recv.split(",")[1])
-                    distanceLong = float(recv.split(",")[2])
-                except:
-                    cartGlobal.log(f"exception with message: '{recv[:-2]}', no valid distance value found")
-                    distanceShort = -1
-                    distanceLong = -1
-                cartGlobal.setMovementBlocked(True)
-                if distanceShort < distanceLong:
-                    distance = distanceShort
-                else:
-                    distance = distanceLong
-                gui.controller.updateDistanceSensorObstacle(distance)
+                elif msgID == "!A2":    #"obstacle:":
+                    #!A2,<shortest distance>,<farthest distance>,<first sensorId with exceeding range>
+                    try:
+                        distanceShort = float(recv.split(",")[1])
+                        distanceLong = float(recv.split(",")[2])
+                        sensorID = int(recv.split(",")[3])
+                    except:
+                        cartGlobal.log(f"exception with message: '{recv[:-2]}', error in message structure")
+                        distanceShort = -1
+                        distanceLong = -1
+                    cartGlobal.setMovementBlocked(True)
+                    if distanceShort < distanceLong:
+                        distance = distanceShort
+                    else:
+                        distance = distanceLong
+                    gui.controller.updateDistanceSensorObstacle(distance, sensorID)
+                    gui.controller.updateDistanceSensorAbyss("", -1)
 
 
-            elif msgID == "!A3":    #"abyss:":
-                #!A3,<distance>
-                try:
-                    distanceShort = float(recv.split(",")[1])
-                    distanceLong = float(recv.split(",")[2])
-                except:
-                    cartGlobal.log(f"exception with message: '{recv[:-2]}', no valid distance value found")
-                    distanceShort = -1
-                    distanceLong = -1
+                elif msgID == "!A3":    #"abyss:":
+                    #!A2,<farthest distance>,<farthest distance>,<first sensorId with exceeding range>
+                    try:
+                        distanceShort = float(recv.split(",")[1])
+                        distanceLong = float(recv.split(",")[2])
+                        sensorID = int(recv.split(",")[3])
+                    except:
+                        cartGlobal.log(f"exception with message: '{recv[:-2]}', error in message structure")
+                        distanceShort = -1
+                        distanceLong = -1
 
-                if distanceShort > distanceLong:
-                    distance = distanceShort
-                else:
-                    distance = distanceLong
+                    if distanceShort > distanceLong:
+                        distance = distanceShort
+                    else:
+                        distance = distanceLong
 
-                cartGlobal.setMovementBlocked(True)
-                gui.controller.updateDistanceSensorAbyss(distance)
+                    cartGlobal.setMovementBlocked(True)
+                    gui.controller.updateDistanceSensorAbyss(distance, sensorID)
+                    gui.controller.updateDistanceSensorObstacle("", -1)
 
 
-            elif msgID == "!A5":    #"cart stopped":
-                #!A3
-                cartGlobal.setOrientation(round(float(recv.split(",")[1])))      # delays with A9 occurred
+                elif msgID == "!A4":    # free path after move blocked
+                    cartGlobal.setMovementBlocked(False)
+                    gui.controller.updateDistanceSensorAbyss("", -1)
+                    gui.controller.updateDistanceSensorObstacle("", -1)
 
-                cartGlobal.setMovementBlocked(False)
-                cartGlobal.setCartRotating(False)
-                cartGlobal.setCartMoving(False)
-                cartGlobal.log("!A5 cart stopped received from Arduino")
 
-            elif msgID == "!A9":    # orientation x:":
-                #!A9,<orientation>
-                try:
-                    newOrientation = round(float(recv.split(",")[1]))
-                except:
-                    cartGlobal.log("!A9 not able to retrieve orientation {recv[:-2]}")
-                    newOrientation = cartGlobal.getOrientation()
+                elif msgID == "!A5":    #"cart stopped":
+                
+                    cartGlobal.setOrientation(round(float(recv.split(",")[1])))      # delays with A9 occurred
 
-                # test for change of orientation
-                if  cartGlobal.getOrientation() != newOrientation:
-                    cartGlobal.setOrientation(newOrientation)
-                    #cartGlobal.log(f"new cart orientation: {newOrientation}")
+                    cartGlobal.setMovementBlocked(False)
+                    cartGlobal.setCartRotating(False)
+                    cartGlobal.setCartMoving(False)
+                    cartGlobal.log("<-A " + recv[:-2])      # stop and reason
+                    cartGlobal.log("!A5 cart stopped received from Arduino")
 
-                    # if cart is in rotation no blocking exists
-                    if cartGlobal.getMovementBlocked()[0]:
-                        cartGlobal.setMovementBlocked(False)
 
-                # no new orientation, check for blocked movement and stop cart
-                else:
-                    blocked, startTime = cartGlobal.getMovementBlocked()
-                    if blocked:
-                        if time.time() - startTime > 3:
-                            if cartGlobal.isCartMoving():
-                                cartGlobal.log("cart stopped by MovementBlocked")
-                                sendStopCommand()
-                                cartGlobal.setMovementBlocked(False)
+                elif msgID == "!A6":    # cart docked
+                    # Arduino triggers the relais for loading batteries through the docking contacts
+                    # gui update by heartbeat logic
+                    cartGlobal.log("cart docked")
+                    if cartGlobal.navManager is not None:
+                        cartGlobal.navManager.root.cartDocked(True)
+
+
+                elif msgID == "!A7":    # cart docked
+                    # Arduino releases the relais for loading batteries through the docking contacts
+                    cartGlobal.log("cart undocked")
+                    if cartGlobal.navManager is not None:
+                        cartGlobal.navManager.root.cartDocked(False)
+
+
+                elif msgID == "!A8":    #12 V supply, measured value
+                    cartGlobal.log(f"{recv[:-2]} received")
+                    try:
+                        newVoltage12V = round(float(recv.split(",")[1]))
+                    except:
+                        cartGlobal.log("!A8 not able to retrieve voltage value {recv[:-2]}")
+                        newVoltage12V = cartGlobal.getVoltage12V()
+
+                    # test for change in Voltage
+                    if  abs(newVoltage12V - cartGlobal.getVoltage12V() ) > 500:
+                        cartGlobal.setVoltage12V(newVoltage12V)
+                        cartGlobal.log(f"new 12V voltage read [mV]: {newVoltage12V}")
+
+
+                elif msgID == "!A9":    # orientation x:":
+                    #!A9,<orientation>
+                    try:
+                        newOrientation = round(float(recv.split(",")[1]))
+                    except:
+                        cartGlobal.log("!A9 not able to retrieve orientation {recv[:-2]}")
+                        newOrientation = cartGlobal.getOrientation()
+
+                    # test for change of orientation
+                    if  cartGlobal.getOrientation() != newOrientation:
+                        cartGlobal.setOrientation(newOrientation)
+                        #cartGlobal.log(f"new cart orientation: {newOrientation}")
+
+                        # if cart is in rotation no blocking exists
+                        if cartGlobal.getMovementBlocked()[0]:
+                            cartGlobal.setMovementBlocked(False)
+
+                    # no new orientation, check for blocked movement and stop cart
+                    else:
+                        blocked, startTime = cartGlobal.getMovementBlocked()
+                        if blocked:
+                            if time.time() - startTime > 3:
+                                if cartGlobal.isCartMoving():
+                                    #cartGlobal.log("cart stopped by MovementBlocked")
+                                    sendStopCommand("blocked movement")
+                                    cartGlobal.setMovementBlocked(False)
                         
-            else:
-                try:
-                    cartGlobal.log("<-A " + recv[:-2])
-                except:
-                    cartGlobal.log(f"Unexpected error on reading messages: {sys.exc_info()[0]}")
-            
+                else:
+                    try:
+                        cartGlobal.log("<-A " + recv[:-2])
+                    except:
+                        cartGlobal.log(f"Unexpected error on reading messages: {sys.exc_info()[0]}")
+
+        except portNotOpenError as e:
+            pass
+                
             #cartGlobal.log("msg processed")
         time.sleep(0.001)    # give other threads a chance
 
@@ -156,60 +200,72 @@ def readMessages():
 ########################################################################
 ########################################################################
 def sendConfigValues():
-    msg = 'a' + str(cartGlobal.MIN_RANGE_SHORT).zfill(2) + str(cartGlobal.MAX_RANGE_SHORT).zfill(2) + str(cartGlobal.MIN_RANGE_LONG).zfill(2) + str(cartGlobal.MAX_RANGE_LONG).zfill(2)
+    msg = 'a' + str(cartGlobal.SHORT_RANGE_MIN).zfill(2) + str(cartGlobal.SHORT_RANGE_MAX).zfill(2) \
+        + str(cartGlobal.LONG_RANGE_MIN).zfill(2) + str(cartGlobal.LONG_RANGE_MAX).zfill(2) + str(cartGlobal.delayBetweenDistanceMeasurements).zfill(2)
     ser.write(bytes(msg + '\n', 'ascii'))
+
+    msg = f"b,{cartGlobal.SPEED_FACTOR:07.4f},{cartGlobal.SPEED_OFFSET:07.4f},{cartGlobal.SPEED_FACTOR_SIDEWAY:05.2f},{cartGlobal.SPEED_FACTOR_DIAGONAL:05.2f}"
+    ser.write(bytes(msg + '\n', 'ascii'))
+
     #cartGlobal.log(f"{msg}")
 
 
 def sendMoveCommand(direction, speed, distanceMm):
     '''
-    move command to cart
-    the arduino does not have an odometer and movement it limited with a max duration (ms)
-    when the floor cam tracking detects requested distance travelled it sends a
-    stop cart to the arduino
-    the arduino also monitors movement / rotation progress and may stop the cart on its own
+    send move command to cart
+    distance calculation is based on time travelled and requested speed
+    if final orientation <> initial orientation send a rotate command at the end to end up in same orientation
     '''
-    # conmmand 1
+    # conmmand 1,<dir>,<speed>,<distance>,<max duration>
+    # e.g. forward, speed=180, distance=100 mm, max duration=5 s: 1,0,180,0100,0005
     distanceMmLimited = min(distanceMm, 2500)       # limit distance for single command
+
+    # for small side moves add slippage distance
+    #if (direction == 4 or direction == 5) and distanceMmLimited < 100:
+    #    distanceMmLimited += 50
+
     cartGlobal.setCartMoveDistance(distanceMmLimited)
     cartGlobal.setRequestedCartSpeed(speed)
-    duration = ((distanceMm / speed) * 2200) + 1000
-    durationLimited = min(duration, 8000)      # do not move more than 8 seconds
-    moveMsg = bytes('1' + str(direction) + str(speed).zfill(3) + str(int(durationLimited)).zfill(4) + '\n', 'ascii')
-    ser.write(moveMsg) 
+    duration = ((distanceMmLimited / speed) * 2200) + 1500
+    durationLimited = min(duration, 9999)           # do not move more than 10 seconds
+    moveMsg = f"1,{direction},{speed:03.0f},{distanceMmLimited:04.0f},{durationLimited:04.0f}"
+    ser.write(bytes(moveMsg + "\n", 'ascii')) 
 
     cartGlobal.setMovementBlocked(False)
     cartGlobal.setCartMoving(True)
 
-    cartGlobal.log(f"Send move {moveMsg}, speed: {int(speed)}, distance: {distanceMmLimited}, duration: {durationLimited}")
+    cartGlobal.log(f"Send move {moveMsg}, speed: {speed:.0f}, distance: {distanceMmLimited:.0f}, duration: {durationLimited:.0f}")
 
 
-def sendRotateCommand(relAngle):
+def sendRotateCommand(relAngle, speed):
 
     ROTATION_SPEED = 200
 
     cartGlobal.setMovementBlocked(False)
     cartGlobal.setTargetOrientation(relAngle)
-    cartGlobal.setRequestedCartSpeed(ROTATION_SPEED)        # Arduino uses fixed rotation speed
+    cartGlobal.setRequestedCartSpeed(speed)
 
     # command 2
-    if relAngle > 0:   # rotate counterclock
-        msg = bytes(str(2000+abs(relAngle))+'\n', 'ascii')
-        cartGlobal.log("Send rotate counterclock " + str(msg))
-        ser.write(msg) 
+    # msg = f"b,{cartGlobal.SPEED_FACTOR:07.4f},{cartGlobal.SPEED_EXPONENT:07.4f},{cartGlobal.SPEED_FACTOR_SIDEWAY:05.2f}"
+    # ser.write(bytes(msg + '\n', 'ascii'))
+
+    if relAngle < 0:   # rotate counterclock
+        msg = f"2,{abs(relAngle):03.0f},{speed:03.0f}"
+        cartGlobal.log(f"Send rotate counterclock {msg}")
+        ser.write(bytes(msg + '\n', 'ascii'))
 
     # command 3
-    if relAngle < 0:
-        msg = bytes(str(3000+abs(relAngle))+'\n', 'ascii')
-        cartGlobal.log("Send rotate clockwise" + str(msg))
-        ser.write(msg) 
+    if relAngle > 0:
+        msg = f"3,{abs(relAngle):03.0f},{speed:.03f}"
+        cartGlobal.log(f"Send rotate clockwise {msg}")
+        ser.write(bytes(msg + '\n', 'ascii'))
 
 
-def sendStopCommand():
+def sendStopCommand(reason):
 
     # command 4
     msg = b'4' + b'\n'
-    cartGlobal.log("Send stop "+str(msg))
+    cartGlobal.log(f"Send stop, reason: {reason}")
     ser.write(msg)
     cartGlobal.setCartMoving(False)
 
@@ -223,21 +279,24 @@ def sendSpeedCommand(speed):
     cartGlobal.setRequestedCartSpeed(speed)
 
 
-def getCartOrientation():
-
-    msg = b'5' + b'\n'
-    #cartGlobal.log("get Orientation " + msg)
-    ser.write(msg)
-
-
 def sendReadSensorCommand(sensorID):
 
     msg = b'7' + bytes(str(sensorID), 'ascii') + b'\n'
     cartGlobal.log("Send readSensor " + str(msg))
     ser.write(msg) 
 
+
 def sendHeartbeat():
 
-    msg = b'9' + b'\n'
+    try:
+        msg = b'9' + b'\n'
+        ser.write(msg)
+    except portNotOpenError as e:
+        pass
+
+def getCartOrientation():
+
+    msg = b'5' + b'\n'
+    #cartGlobal.log("get Orientation " + msg)
     ser.write(msg)
 

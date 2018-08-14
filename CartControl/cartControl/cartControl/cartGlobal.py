@@ -1,20 +1,31 @@
 
 import time
 import sys
+import io
 import numpy as np
+import psutil
 import cv2
-
 
 ##################################################################
 # cartControl can run as slave of navManager or in standalone mode
 ##################################################################
 standAloneMode = False   # False -> slave mode,  True -> standalone mode
 
+
 # configuration values for cart arduino infrared distance limits
-MIN_RANGE_SHORT=9
-MAX_RANGE_SHORT=16
-MIN_RANGE_LONG=16
-MAX_RANGE_LONG=30
+SHORT_RANGE_MIN=6
+SHORT_RANGE_MAX=18
+LONG_RANGE_MIN=12
+LONG_RANGE_MAX=34
+delayBetweenDistanceMeasurements=1     # can probably be lower when battery fully loaded
+
+# values for arduino to calculate distance mm/s from speed value
+# (values depend on battery level too, see excel sheet for calc)
+SPEED_FACTOR=1.49
+SPEED_OFFSET=44.6
+SPEED_FACTOR_SIDEWAY=0.5
+SPEED_FACTOR_DIAGONAL=0.63
+
 
 # odometry is only active when cart is moving
 _cartMoving = False
@@ -24,13 +35,15 @@ _cartSpeedFromOdometry = 0
 
 _movementBlocked = False
 _timeMovementBlocked = None
-_moveDistance = 0
+_moveDistanceRequested = 0
 _moveStartX = 0
 _moveStartY = 0
 _cartOrientation = 0
 _targetOrientation = 0
 _moveStartTime = None
 _odometryRunning = False
+_lastCartCommand = ""
+_orientationBeforeMove = 0
 
 # Current cart position (center of cart) relative to map center, values in mm
 _cartPositionX = 0
@@ -43,21 +56,26 @@ _lastDyPixPerSec = 0
 #_lastGoodMoveTimestamp = time.time()
 _lastDistEvalTimestamp = time.time()
 
+_lastBatteryCheckTime = time.time()
+_batteryStatus = None
 arduinoStatus = 0
+_mVolts12V = 0
 
 # pixel-width in mm at 13 cm distance from ground
-PIX_PER_MM = 0.47
+#PIX_PER_MM = 0.7
 
 navManager = None
 
 taskStarted = time.time()
+_f = None
 #def startlog():
 #    logging.basicConfig(filename="cartControl.log", level=logging.INFO, format='%(asctime)s - %(name)s - %(message)s', filemode="w")
 
 def log(msg):
-    if standAloneMode or navManager is None:
-        print(f"time: {time.time()-taskStarted:.3f} "  + msg)
-    else:
+
+    print(f"time: {time.time()-taskStarted:.3f} "  + msg)
+    
+    if navManager is not None:
         navManager.root.recordLog("cart - " + msg)
 
 
@@ -71,9 +89,9 @@ def saveImg(img, frameNr):
 
 def setCartMoveDistance(distanceMm):
 
-    global _moveDistance, _moveStartX, _moveStartY, _lastDistance, _moveStartTime
+    global _moveDistanceRequested, _moveStartX, _moveStartY, _lastDistance, _moveStartTime
 
-    _moveDistance = distanceMm
+    _moveDistanceRequested = distanceMm
     _moveStartX = _cartPositionX
     _moveStartY = _cartPositionY
     _lastDistance = 0
@@ -81,7 +99,7 @@ def setCartMoveDistance(distanceMm):
     
 
 def getMoveDistance():
-    return _moveDistance
+    return _moveDistanceRequested
 
 
 def currMoveDistance():
@@ -94,13 +112,13 @@ def currMoveDistance():
 
 def checkMoveDistanceReached():
 
-    #log(f"moveDistance requested {_moveDistance}, moveDistance current {int(currMoveDistance())}, moveTime: {time.time() - _moveStartTime:.2f}")
+    #log(f"moveDistance requested {_moveDistanceRequested}, moveDistance current {int(currMoveDistance())}, moveTime: {time.time() - _moveStartTime:.2f}")
 
-    return currMoveDistance() >= _moveDistance
+    return currMoveDistance() >= _moveDistanceRequested
 
 
 def getRemainingDistance():
-    return _moveDistance - currMoveDistance()
+    return _moveDistanceRequested - currMoveDistance()
 
 
 def setCartMoving(new):
@@ -204,15 +222,16 @@ def getMoveStart():
     return _moveStartX, _moveStartY    
 
 
-def updateCartPositionInMm(dx, dy):     # here we use mm not pixels!
+def updateCartPositionInMm(dxPix, dyPix, duration):     # distance is pixels, cart position is mm
 
     global _lastDistance
 
     #log(f"updateCartPosition based on floor images, dx: {dx}, dy: {dy}")
+    pixPerSec = np.hypot(dxPix, dyPix) / duration
 
     posX, posY = getCartPosition()
-    posX += int(dx * PIX_PER_MM)
-    posY += int(dy * PIX_PER_MM)
+    posX += int(dxPix * PIX_PER_MM)
+    posY += int(dyPix * PIX_PER_MM)
     setCartPosition(posX, posY)
 
     startX, startY = getMoveStart()
@@ -220,8 +239,7 @@ def updateCartPositionInMm(dx, dy):     # here we use mm not pixels!
     dyMoved = np.abs(posY - startY)
     currDistance = np.hypot(dxMoved, dyMoved)
 
-#    if currDistance > _lastDistance+20:
-    log(f"cartMovement[mm] total distance: {currDistance:.0f}, total time: {time.time() - _moveStartTime:.2f}")
+    log(f"cartMovement[mm] total distance: {currDistance:.0f}, total time: {time.time() - _moveStartTime:.2f}, curr speed Pix/s: {pixPerSec:.2f}")
  #       _lastDistance = currDistance
 
 
@@ -247,3 +265,48 @@ def setDistEvalTimestamp():
     global _lastDistEvalTimestamp
 
     _lastDistEvalTimestamp = time.time()
+
+
+def getLastBatteryCheckTime():
+    return _lastBatteryCheckTime
+
+def setLastBatteryCheckTime(newTime):
+
+    global _lastBatteryCheckTime
+
+    _lastBatteryCheckTime = newTime
+
+
+def getBatteryStatus():
+    return _batteryStatus
+
+
+def updateBatteryStatus():
+
+    global _batteryStatus
+
+    _batteryStatus = psutil.sensors_battery()
+    setLastBatteryCheckTime(time.time())
+
+    # inform navManager about low battery
+    if _batteryStatus.percent < 25:
+        msg = f"low battery: {_batteryStatus.percent:.0f} percent"
+        if standAloneMode or navManager is None:
+            log(msg)
+        else:
+            navManager.root.lowBattery("cart - " + msg)
+
+
+def getSensorName(sensorID):
+    return ["", "VL nah","VL fern","VR nah","VR fern","left","right","HL nah","HL fern","HR nah","HL fern"][sensorID+1]
+
+
+def getVoltage12V():
+    return _mVolts12V
+
+
+def setVoltage12V(value):
+
+    global _mVolts12V
+
+    _mVolts12V = value

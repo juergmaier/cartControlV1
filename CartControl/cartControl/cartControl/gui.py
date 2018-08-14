@@ -3,6 +3,7 @@ import time
 import collections
 import tkinter as tk
 import numpy as np
+import psutil
 
 import arduino
 import cartGlobal
@@ -20,8 +21,8 @@ todo: pass these values from cartControl to the Arduino on startup
 
 LINE_SCALE_SHORT=2.0
 LINE_SCALE_LONG=1.5
-SHORT_ARC_BOX=(cartGlobal.MAX_RANGE_SHORT + cartGlobal.MIN_RANGE_SHORT) / 2 * LINE_SCALE_SHORT
-LONG_ARC_BOX=(cartGlobal.MAX_RANGE_LONG + cartGlobal.MIN_RANGE_LONG) / 2 * LINE_SCALE_LONG
+SHORT_ARC_BOX=(cartGlobal.SHORT_RANGE_MAX + cartGlobal.SHORT_RANGE_MIN) / 2 * LINE_SCALE_SHORT
+LONG_ARC_BOX=(cartGlobal.LONG_RANGE_MAX + cartGlobal.LONG_RANGE_MIN) / 2 * LINE_SCALE_LONG
 
 
 # use named tupels to make the base positions available
@@ -36,13 +37,13 @@ sensors.append(location(id=0, x=X, y=Y,
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
                         x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_SHORT - cartGlobal.MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(cartGlobal.SHORT_RANGE_MAX - cartGlobal.SHORT_RANGE_MIN) * LINE_SCALE_SHORT))
 Y=CANV_HEIGHT / 4 - 40
 sensors.append(location(id=1, x=X, y=Y, 
                         x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
                         x2=X + LONG_ARC_BOX, y2=Y + LONG_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_LONG - cartGlobal.MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(cartGlobal.LONG_RANGE_MAX - cartGlobal.LONG_RANGE_MIN) * LINE_SCALE_LONG))
 
 # front right
 X=CANV_WIDTH / 4 * 3
@@ -51,13 +52,13 @@ sensors.append(location(id=2, x=X, y=Y,
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
                         x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_SHORT - cartGlobal.MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(cartGlobal.SHORT_RANGE_MAX - cartGlobal.SHORT_RANGE_MIN) * LINE_SCALE_SHORT))
 Y=CANV_HEIGHT / 4 - 40
 sensors.append(location(id=3, x=X, y=Y, 
                         x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
                         x2=X + LONG_ARC_BOX, y2=Y + LONG_ARC_BOX,
                         arcFrom=0,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_LONG - cartGlobal.MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(cartGlobal.LONG_RANGE_MAX - cartGlobal.LONG_RANGE_MIN) * LINE_SCALE_LONG))
 
 # left
 X=CANV_WIDTH / 4
@@ -66,7 +67,7 @@ sensors.append(location(id=4, x=X, y=Y,
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
                         x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=90,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_SHORT - cartGlobal.MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(cartGlobal.SHORT_RANGE_MAX - cartGlobal.SHORT_RANGE_MIN) * LINE_SCALE_SHORT))
 
 # right
 X=CANV_WIDTH / 4 * 3
@@ -75,7 +76,7 @@ sensors.append(location(id=5, x=X, y=Y,
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
                         x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=270,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_SHORT - cartGlobal.MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(cartGlobal.SHORT_RANGE_MAX - cartGlobal.SHORT_RANGE_MIN) * LINE_SCALE_SHORT))
 
 # back left
 X=CANV_WIDTH / 4
@@ -84,13 +85,13 @@ sensors.append(location(id=6, x=X, y=Y,
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
                         x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_SHORT - cartGlobal.MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(cartGlobal.SHORT_RANGE_MAX - cartGlobal.SHORT_RANGE_MIN) * LINE_SCALE_SHORT))
 Y=CANV_HEIGHT / 4 * 3 + 40
 sensors.append(location(id=7, x=X, y=Y, 
                         x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
                         x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_LONG - cartGlobal.MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(cartGlobal.LONG_RANGE_MAX - cartGlobal.LONG_RANGE_MIN) * LINE_SCALE_LONG))
 
 # back right
 X=CANV_WIDTH / 4 * 3
@@ -99,14 +100,14 @@ sensors.append(location(id=8, x=X, y=Y,
                         x1=X - SHORT_ARC_BOX, y1=Y - SHORT_ARC_BOX, 
                         x2=X + SHORT_ARC_BOX, y2=Y + SHORT_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_SHORT - cartGlobal.MIN_RANGE_SHORT) * LINE_SCALE_SHORT))
+                        arcWidth=(cartGlobal.SHORT_RANGE_MAX - cartGlobal.SHORT_RANGE_MIN) * LINE_SCALE_SHORT))
 
 Y=CANV_HEIGHT / 4 * 3 + 40
 sensors.append(location(id=9, x=X, y=Y, 
                         x1=X - LONG_ARC_BOX, y1=Y - LONG_ARC_BOX, 
                         x2=X + LONG_ARC_BOX,y2=Y + LONG_ARC_BOX,
                         arcFrom=180,arcLength=180, 
-                        arcWidth=(cartGlobal.MAX_RANGE_LONG - cartGlobal.MIN_RANGE_LONG) * LINE_SCALE_LONG))
+                        arcWidth=(cartGlobal.LONG_RANGE_MAX - cartGlobal.LONG_RANGE_MIN) * LINE_SCALE_LONG))
 
 # global variables
 gui=None
@@ -142,13 +143,13 @@ class manualControl:
         self.lblDistanceObstacle=tk.Label(frame, text="distance to obstacle: ")
         self.lblDistanceObstacle.grid(row = 20, column = 0, sticky=tk.E)
 
-        self.lblDistanceObstacleValue=tk.Label(frame, text=" ")
+        self.lblDistanceObstacleValue=tk.Label(frame, text=" ", fg="white", bg="red")
         self.lblDistanceObstacleValue.grid(row = 20, column = 1)
 
         self.lblDistanceAbyss=tk.Label(frame, text="max distance value: ")
         self.lblDistanceAbyss.grid(row = 25, column = 0, sticky=tk.E)
 
-        self.lblDistanceAbyssValue=tk.Label(frame, text=" ")
+        self.lblDistanceAbyssValue=tk.Label(frame, text=" ", fg="white", bg="red")
         self.lblDistanceAbyssValue.grid(row = 25, column = 1)
     
         self.lblCommand=tk.Label(frame, text="command: ")
@@ -175,7 +176,7 @@ class manualControl:
         self.separator1=tk.Frame(frame, height=3, bd=2, relief=tk.SUNKEN)
         self.separator1.grid(row=45, column=0, columnspan=2, pady=10, sticky="we")
 
-        self.lblRotationHelp1=tk.Label(frame, text="+ counterclock")
+        self.lblRotationHelp1=tk.Label(frame, text="- counterclock")
         self.lblRotationHelp1.grid(row = 50, column = 0, sticky=tk.E)
         
         self.sbRotation=tk.Spinbox(frame, from_=-90, to=90, width=3)
@@ -183,7 +184,7 @@ class manualControl:
         self.sbRotation.delete(0,"end")
         self.sbRotation.insert(0,30)
 
-        self.lblRotationHelp2=tk.Label(frame, text="- clockwise")
+        self.lblRotationHelp2=tk.Label(frame, text="+ clockwise")
         self.lblRotationHelp2.grid(row = 52, column = 0, sticky=tk.E)
 
         self.btnRotate=tk.Button(frame, text="Rotate", state="disabled", command=self.rotateCart)
@@ -311,12 +312,12 @@ class manualControl:
 
             if s.get('range') == 'long': 
                 lengthFactor=LINE_SCALE_LONG
-                minRange=cartGlobal.MIN_RANGE_LONG
-                maxRange=cartGlobal.MAX_RANGE_LONG
+                minRange=cartGlobal.LONG_RANGE_MIN
+                maxRange=cartGlobal.LONG_RANGE_MAX
             else: 
                 lengthFactor=LINE_SCALE_SHORT
-                minRange=cartGlobal.MIN_RANGE_SHORT
-                maxRange=cartGlobal.MAX_RANGE_SHORT
+                minRange=cartGlobal.SHORT_RANGE_MIN
+                maxRange=cartGlobal.SHORT_RANGE_MAX
 
             for k in range(cartControl.NUM_MEASUREMENTS_PER_SCAN):
 
@@ -335,20 +336,24 @@ class manualControl:
 
                     if age > 2:
                         col="coral1"
+                        lineWidth = 2
                     else:
                         col="red"
+                        lineWidth = 2
                 else:
                     if age > 2:
                         col="paleGreen"
+                        lineWidth = 1
                     else:
                         col="green"
+                        lineWidth = 1
 
                 # Angle = value index * 15 + const + start rotation of arc
                 xOffset=np.cos(np.radians(k * 15 + 15 + s.get('rotation'))) * lineLength * lengthFactor
                 yOffset=np.sin(np.radians(k * 15 + 15 + s.get('rotation'))) * lineLength * lengthFactor
                     
                 try:
-                    self.canvas.create_line(sensor.x, sensor.y, sensor.x + xOffset, sensor.y + yOffset, fill=col)
+                    self.canvas.create_line(sensor.x, sensor.y, sensor.x + xOffset, sensor.y + yOffset, fill=col, width=lineWidth)
                 except:
                     cartGlobal.log("ERROR: sensor.x,.y: " + str(sensor.x) + ", " + str(sensor.y))
 
@@ -369,12 +374,14 @@ class manualControl:
         self.btnArduino.configure(state = "disabled")
 
         self.w.update_idletasks()
-        self.w.after(2000, self.checkStatus)
+        self.w.after(2000, self.checkArduinoReady)
 
 
-    def checkStatus(self):
-
-        #cartGlobal.log("checkStatus")
+    def checkArduinoReady(self):
+        '''
+        this is only called when arduino is not ready yet
+        '''
+        #cartGlobal.log("checkArcuinoReady")
     
         if cartGlobal.arduinoStatus == 1:
             self.lblInfo.configure(text = "cart ready", bg="lawn green", fg="black")
@@ -383,9 +390,9 @@ class manualControl:
             self.btnNav.configure(state="normal")
             self.w.update_idletasks()
             self.w.after(100, self.heartBeat)
-            #arduino.getCartOrientation()
+
         else:
-            self.w.after(400, self.checkStatus)
+            self.w.after(400, self.checkArduinoReady)
       
 
     def navigateTo(self):
@@ -412,13 +419,26 @@ class manualControl:
         # check for updating new sensor data in gui
         self.showNewDistances()
 
+        # update battery level every x seconds
+        if time.time() - cartGlobal.getLastBatteryCheckTime() > 5:
+            cartGlobal.updateBatteryStatus()
+            battery = cartGlobal.getBatteryStatus()
+            plugged = battery.power_plugged
+            if not plugged: 
+                plugged="on battery"
+            else: 
+                plugged="docked"
+            batteryInfo = f", power: {plugged}, percent: {battery.percent:.0f}" 
+            self.lblInfo.configure(text = "cart ready" + batteryInfo, bg="lawn green", fg="black")
+            cartGlobal.setLastBatteryCheckTime(time.time())
+
         self.w.update_idletasks()
         self.w.after(500, self.heartBeat)   # heart beat loop
 
 
     def stopCart(self):
 
-        arduino.sendStopCommand()
+        arduino.sendStopCommand("manual request")
         arduino.getCartOrientation()
         self.lblRotationCurrentValue.configure(text=str(cartGlobal.getOrientation()))
         self.lblCommandValue.configure(text="Stop")
@@ -449,18 +469,21 @@ class manualControl:
         self.lblCommandValue.configure(text="Rotate")
         targetOrientation=(cartGlobal.getOrientation() + relAngle) % 360
         self.lblRotationTargetValue.configure(text=str(targetOrientation))
-        arduino.sendRotateCommand(relAngle)
+        arduino.sendRotateCommand(relAngle, 150)
         self.w.update_idletasks()
 
 
-    def updateDistanceSensorObstacle(self, distance):
-        self.lblDistanceObstacleValue.configure(text=str(distance))
+    def updateDistanceSensorObstacle(self, distance, sensorID):
+        info = f"{distance}, {cartGlobal.getSensorName(sensorID)}"
+        self.lblDistanceObstacleValue.configure(text=info)
         self.w.update_idletasks()
 
 
-    def updateDistanceSensorAbyss(self, distance):
-        self.lblDistanceAbyssValue.configure(text=str(distance))
+    def updateDistanceSensorAbyss(self, distance, sensorID):
+        info = f"{distance}, {cartGlobal.getSensorName(sensorID)}"
+        self.lblDistanceAbyssValue.configure(text=info)
         self.w.update_idletasks()
+
 
     def updateTargetRotation(self, degrees):
         self.lblRotationTargetValue.configure(text=str(degrees))
@@ -476,4 +499,7 @@ def startGui():
 
     controller=manualControl(gui)
     #cartGlobal.log "gui initialized in: ", time.time()-start, " seconds"
-    gui.mainloop()
+    try:
+        gui.mainloop()
+    except:
+        print("exception in tk")

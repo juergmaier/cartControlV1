@@ -12,8 +12,6 @@ import gui
 import arduino
 
 import cartGlobal
-import odometry
-
 
 CART_PORT = 20003
 
@@ -94,6 +92,8 @@ def cartInit():
     if cartGlobal.arduinoStatus == 0:
         print("cart - timeout in startup, terminating")
         raise SystemExit()
+
+    cartGlobal.loadCartLocation()
 
 
 def updateDistances(Values):
@@ -205,7 +205,8 @@ class cartCommands(rpyc.Service):
     def exposed_isCartMoving(self):
         return cartGlobal.isCartMoving()
 
-
+    def exposed_isCartRotating(self):
+        return cartGlobal.isCartRotating()
 
 if __name__ == '__main__':
 

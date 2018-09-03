@@ -1,10 +1,13 @@
 
 import time
 import sys
+import os
 import io
 import numpy as np
 import psutil
 import cv2
+import json
+from enum import Enum
 
 ##################################################################
 # cartControl can run as slave of navManager or in standalone mode
@@ -26,6 +29,19 @@ SPEED_OFFSET=44.6
 SPEED_FACTOR_SIDEWAY=0.5
 SPEED_FACTOR_DIAGONAL=0.63
 
+class Direction(Enum):
+    STOP = 0
+    FORWARD = 1
+    FOR_DIAG_RIGHT = 2
+    FOR_DIAG_LEFT = 3
+    LEFT = 4
+    RIGHT = 5
+    BACKWARD = 6
+    BACK_DIAG_RIGHT = 7
+    BACK_DIAG_LEFT = 8
+    ROTATE_LEFT = 9
+    ROTATE_RIGHT = 10
+    
 
 # odometry is only active when cart is moving
 _cartMoving = False
@@ -38,23 +54,18 @@ _timeMovementBlocked = None
 _moveDistanceRequested = 0
 _moveStartX = 0
 _moveStartY = 0
-_cartOrientation = 0
 _targetOrientation = 0
 _moveStartTime = None
 _odometryRunning = False
 _lastCartCommand = ""
 _orientationBeforeMove = 0
+_moveDirection = 0
 
 # Current cart position (center of cart) relative to map center, values in mm
+_cartOrientation = 0
 _cartPositionX = 0
 _cartPositionY = 0
 
-_lastDistance = 0
-_lastDxPixPerSec = 0
-_lastDyPixPerSec = 0
-#_lastTrackedMoveDuration = 0
-#_lastGoodMoveTimestamp = time.time()
-_lastDistEvalTimestamp = time.time()
 
 _lastBatteryCheckTime = time.time()
 _batteryStatus = None
@@ -89,37 +100,36 @@ def saveImg(img, frameNr):
 
 def setCartMoveDistance(distanceMm):
 
-    global _moveDistanceRequested, _moveStartX, _moveStartY, _lastDistance, _moveStartTime
+    global _moveDistanceRequested, _moveStartX, _moveStartY, _moveStartTime
 
     _moveDistanceRequested = distanceMm
     _moveStartX = _cartPositionX
     _moveStartY = _cartPositionY
-    _lastDistance = 0
     _moveStartTime = time.time()
     
-
+'''
 def getMoveDistance():
     return _moveDistanceRequested
-
-
+'''
+'''
 def currMoveDistance():
 
     dx = np.abs(_cartPositionX - _moveStartX)
     dy = np.abs(_cartPositionY - _moveStartY)
 
     return int(np.hypot(dx, dy))
-
-
+'''
+'''
 def checkMoveDistanceReached():
 
     #log(f"moveDistance requested {_moveDistanceRequested}, moveDistance current {int(currMoveDistance())}, moveTime: {time.time() - _moveStartTime:.2f}")
 
     return currMoveDistance() >= _moveDistanceRequested
-
-
+'''
+'''
 def getRemainingDistance():
     return _moveDistanceRequested - currMoveDistance()
-
+'''
 
 def setCartMoving(new):
 
@@ -206,13 +216,42 @@ def getOrientation():
     return _cartOrientation
 
 
+def calculateNewCartPosition(orientation, distance, direction):
+    
+    global _cartPositionX, _cartPositionY
+
+    # take cart orientation and cart move direction into account
+    startX, startY = getMoveStart()
+
+    if direction == Direction.FORWARD.value:
+        moveDirection =  _cartOrientation
+    elif direction == Direction.BACKWARD.value:
+        moveDirection =  (_cartOrientation + 180) % 360
+    elif direction == Direction.LEFT.value:
+        moveDirection =  (_cartOrientation + 90) % 360
+    elif direction == Direction.RIGHT.value:
+        moveDirection =  (_cartOrientation - 90) % 360
+    elif direction == Direction.FOR_DIAG_LEFT.value:
+        moveDirection =  (_cartOrientation + 45) % 360
+    elif direction == Direction.FOR_DIAG_RIGHT.value:
+        moveDirection =  (_cartOrientation - 45) % 360
+    elif direction == Direction.BACK_DIAG_LEFT.value:
+        moveDirection =  (_cartOrientation + 135) % 360
+    elif direction == Direction.BACK_DIAG_RIGHT.value:
+        moveDirection =  (_cartOrientation -135) % 360
+
+    _cartPositionX = startX + int(distance * np.cos(np.radians(moveDirection)))
+    _cartPositionY = startY + int(distance * np.sin(np.radians(moveDirection)))
+
+
+'''
 def setCartPosition(newX, newY):
 
     global _cartPositionX, _cartPositionY
 
     _cartPositionX = newX
     _cartPositionY = newY
-
+'''
 
 def getCartPosition():
     return _cartPositionX, _cartPositionY
@@ -222,6 +261,8 @@ def getMoveStart():
     return _moveStartX, _moveStartY    
 
 
+'''
+not used as optical movement recognition did not work
 def updateCartPositionInMm(dxPix, dyPix, duration):     # distance is pixels, cart position is mm
 
     global _lastDistance
@@ -253,22 +294,16 @@ def setOdometryRunning(newStatus):
 
 def isOdometryRunning():
     return _odometryRunning
-
+'''
 
 def getRemainingRotation():
     d = abs(_cartOrientation - _targetOrientation) % 360
     return 360 - d if d > 180 else d
 
 
-def setDistEvalTimestamp():
-
-    global _lastDistEvalTimestamp
-
-    _lastDistEvalTimestamp = time.time()
-
-
 def getLastBatteryCheckTime():
     return _lastBatteryCheckTime
+
 
 def setLastBatteryCheckTime(newTime):
 
@@ -310,3 +345,39 @@ def setVoltage12V(value):
     global _mVolts12V
 
     _mVolts12V = value
+
+
+def saveCartLocation():
+    # Saving the objects:
+    cartData = { 'posX':int(_cartPositionX), 'posY':int(_cartPositionY), 'orientation':int(_cartOrientation)}
+    filename = f"cartLocation.json"
+    with open(filename, "w") as write_file:
+        json.dump(cartData, write_file)
+
+
+def loadCartLocation():
+
+    global _cartPositionX, _cartPositionY, _cartOrientation
+
+    # Getting back the last saved cart data
+    filename = f"cartLocation.json"
+    if os.path.exists(filename):
+        with open(filename, "r") as read_file:
+            cartData = json.load(read_file)
+
+        _cartPositionX = cartData['posX']
+        _cartPositionY = cartData['posY']
+        _cartOrientation = cartData['orientation']
+    else:
+        _cartPositionX = 0
+        _cartPositionY = 0
+        _cartOrientation = 0
+
+
+def setMoveDirection(direction):
+
+        global _moveDirection
+
+        _moveDirection = direction
+
+

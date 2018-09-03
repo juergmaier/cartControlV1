@@ -164,7 +164,7 @@ class manualControl:
         self.lblRotationTargetValue=tk.Label(frame, text=" ")
         self.lblRotationTargetValue.grid(row = 35, column = 1)
 
-        self.lblRotationCurrent=tk.Label(frame, text="current yaw: ")
+        self.lblRotationCurrent=tk.Label(frame, text="current yaw/x/y: ")
         self.lblRotationCurrent.grid(row = 40, column = 0, sticky=tk.E)
 
         self.lblRotationCurrentValue=tk.Label(frame, text=" ")
@@ -413,8 +413,8 @@ class manualControl:
             self.lblHeartBeat.configure(fg = "red")
 
         arduino.sendHeartbeat()
-        # arduino.getCartOrientation()
-        self.lblRotationCurrentValue.configure(text=str(cartGlobal.getOrientation()))
+
+        self.lblRotationCurrentValue.configure(text=f"{cartGlobal.getOrientation()} / {cartGlobal._cartPositionX} / {cartGlobal._cartPositionY}")
 
         # check for updating new sensor data in gui
         self.showNewDistances()

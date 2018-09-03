@@ -33,9 +33,6 @@
     <Compile Include="gui.py">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="odometry.py">
-      <SubType>Code</SubType>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|ContinuumAnalytics|Anaconda36-32" />

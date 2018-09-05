@@ -221,27 +221,31 @@ def calculateNewCartPosition(orientation, distance, direction):
     global _cartPositionX, _cartPositionY
 
     # take cart orientation and cart move direction into account
+    # add 90 degrees to make a forward move with direction 0 a Y+ move
     startX, startY = getMoveStart()
 
     if direction == Direction.FORWARD.value:
         moveDirection =  _cartOrientation
     elif direction == Direction.BACKWARD.value:
-        moveDirection =  (_cartOrientation + 180) % 360
+        moveDirection =  (90 + _cartOrientation + 180) % 360
     elif direction == Direction.LEFT.value:
-        moveDirection =  (_cartOrientation + 90) % 360
+        moveDirection =  (90 + _cartOrientation + 90) % 360
     elif direction == Direction.RIGHT.value:
-        moveDirection =  (_cartOrientation - 90) % 360
+        moveDirection =  (90 + _cartOrientation - 90) % 360
     elif direction == Direction.FOR_DIAG_LEFT.value:
-        moveDirection =  (_cartOrientation + 45) % 360
+        moveDirection =  (90+_cartOrientation + 45) % 360
     elif direction == Direction.FOR_DIAG_RIGHT.value:
-        moveDirection =  (_cartOrientation - 45) % 360
+        moveDirection =  (90+_cartOrientation - 45) % 360
     elif direction == Direction.BACK_DIAG_LEFT.value:
-        moveDirection =  (_cartOrientation + 135) % 360
+        moveDirection =  (90+_cartOrientation + 135) % 360
     elif direction == Direction.BACK_DIAG_RIGHT.value:
-        moveDirection =  (_cartOrientation -135) % 360
+        moveDirection =  (90+_cartOrientation -135) % 360
+    else:
+        moveDirection = None
 
-    _cartPositionX = startX + int(distance * np.cos(np.radians(moveDirection)))
-    _cartPositionY = startY + int(distance * np.sin(np.radians(moveDirection)))
+    if moveDirection is not None:
+        _cartPositionX = startX + int(distance * np.cos(np.radians(moveDirection)))
+        _cartPositionY = startY + int(distance * np.sin(np.radians(moveDirection)))
 
 
 '''
